@@ -32,6 +32,14 @@ Sistema simples de gerenciamento para loja de auto peças, desenvolvido em **Lar
 - **Frontend:** React 19 + TypeScript + Vite (Metronic v9.4) + Tailwind CSS 4
 - **Banco de dados:** PostgreSQL
 - **Ambiente local:** Laravel Herd
+- **Documentação API:** Scribe
+
+---
+
+## Documentação da API
+
+- **URL local:** https://sc360-valsul.test/docs
+- **Regenerar:** `php artisan scribe:generate`
 
 ---
 
