@@ -118,7 +118,7 @@ Sem mexer em rotas, sem criar controller de CRUD. Tudo dinâmico.
 
 | Fase | Descrição |
 |------|-----------|
-| **Fase 1** | Criar migration, model, request, controller |
+| **Fase 1** | Criar migration, model, request, controller (modules, people, users) ✅ |
 | **Fase 2** | Montar rotas |
 | **Fase 3** | Login + tela |
 | **Fase 4** | Dashboard demonstração |
@@ -126,6 +126,7 @@ Sem mexer em rotas, sem criar controller de CRUD. Tudo dinâmico.
 | **Fase 5.1** | Tela show/create/edit/delete/restore (página inteira) |
 | **Fase 5.2** | Tela show/create/edit/delete/restore (modal) |
 | **Fase 6** | Tela people |
+| **Fase 7** | Criar migration, model, request, controller das tabelas restantes (type_documents, type_contacts, type_addresses, notes, files, documents, contacts, addresses) |
 
 ---
 
