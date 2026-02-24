@@ -16,6 +16,9 @@
 frontend/node_modules
 frontend/dist
 frontend/.npmrc
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
 /public/build
 /public/hot
 /public/storage
