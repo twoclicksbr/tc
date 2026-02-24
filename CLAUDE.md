@@ -102,6 +102,10 @@ Uma única `ModuleController` resolve o CRUD de qualquer módulo. Ela busca as c
 
 `{module}` corresponde ao `name_url` da tabela `modules`. Uma única rota atende módulos e submódulos.
 
+Padrão de URL: `{domínio}/valsul/{module}` e `{domínio}/valsul/{module}/{id}`
+
+O `apiPrefix` está vazio — as rotas respondem diretamente na raiz (sem prefixo `/api`).
+
 ### Configuração de Módulo
 
 Os campos `model`, `request`, `controller_front` e `controller_back` são combobox que fazem scan das respectivas pastas e listam os arquivos disponíveis.
@@ -119,7 +123,7 @@ Sem mexer em rotas, sem criar controller de CRUD. Tudo dinâmico.
 | Fase | Descrição |
 |------|-----------|
 | **Fase 1** | Criar migration, model, request, controller (modules, people, users) ✅ |
-| **Fase 2** | Montar rotas |
+| **Fase 2** | Montar rotas (routes/api.php com prefixo `valsul/{module}`, sem prefixo /api) ✅ |
 | **Fase 3** | Login + tela |
 | **Fase 4** | Dashboard demonstração |
 | **Fase 5** | Tela padrão index (grid) |
