@@ -88,6 +88,27 @@ Campos `after_*` são combobox com opções: `index`, `show`, `create`, `edit`.
 
 **Total MVP: 11 tabelas**
 
+#### Tabelas de Sistema (geradas automaticamente)
+
+| Tabela | Descrição |
+|--------|-----------|
+| `personal_access_tokens` | Tokens Sanctum (gerada via migration Sanctum) |
+
+### Autenticação (Sanctum)
+
+Controller: `AuthController` — rotas públicas e protegidas por `auth:sanctum`.
+
+| Método | URL | Descrição | Auth |
+|--------|-----|-----------|------|
+| POST | `api.{domínio}/valsul/auth/login` | Login → retorna token + user | Público |
+| POST | `api.{domínio}/valsul/auth/logout` | Logout → revoga token atual | Bearer |
+| GET | `api.{domínio}/valsul/auth/me` | Retorna usuário autenticado com `person` | Bearer |
+
+Resposta do login:
+```json
+{ "token": "1|abc...", "user": { "id": 1, "email": "...", "active": true, "person": { "id": 1, "name": "..." } } }
+```
+
 ### Padrão de Desenvolvimento
 
 #### Controller Genérica
@@ -120,28 +141,63 @@ Sem mexer em rotas, sem criar controller de CRUD. Tudo dinâmico.
 - **Versão:** Metronic v9.4.5 — React 19 + Vite 7 + TypeScript + Tailwind CSS 4
 - **Layout de referência:** `C:\Herd\themeforest\metronic\crm`
 - **URL local:** http://sc360-valsul.test:5173
-- **Auth:** Supabase desabilitado (placeholder) — será substituído por auth Laravel
+- **Auth:** Supabase ainda ativo como adapter — substituição por Laravel Sanctum pendente (Fase 3)
 - **Status:** instalado, rodando em dev
+- **Layout em uso:** `Demo1Layout` (`frontend/src/layouts/demo1/`)
+- **Provider de auth em uso:** `AuthProvider` de `frontend/src/auth/providers/supabase-provider.tsx` (importado em `App.tsx`)
+
+### Variáveis de Ambiente (`frontend/.env`)
+
+```env
+VITE_APP_NAME=metronic-tailwind-react
+VITE_APP_VERSION=9.2.6
+VITE_SUPABASE_URL=your_supabase_url          # placeholder — não usado em produção
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+VITE_SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+# A adicionar:
+# VITE_API_URL=http://api.sc360-valsul.test
+```
+
+### Auth atual (Supabase) — estrutura em `frontend/src/auth/`
+
+| Arquivo | Descrição |
+|---------|-----------|
+| `adapters/supabase-adapter.ts` | Adapter Supabase (login, logout, register, OAuth, etc.) |
+| `providers/supabase-provider.tsx` | AuthProvider — expõe `login`, `logout`, `getUser`, etc. via context |
+| `context/auth-context.ts` | AuthContext + hook `useAuth()` |
+| `lib/models.ts` | `AuthModel` (`access_token`, `refresh_token?`) e `UserModel` |
+| `lib/helpers.ts` | getAuth/setAuth/removeAuth via localStorage |
+| `require-auth.tsx` | HOC que redireciona para `/auth/signin` se não autenticado |
 
 ### Estrutura frontend/src/
 
 ```
 src/
-├── App.tsx
+├── App.tsx               ← importa AuthProvider de supabase-provider
 ├── main.tsx
-├── auth/           ← providers, adapters, pages de login/register
-├── components/     ← componentes reutilizáveis
-├── config/         ← configurações do app
-├── css/            ← estilos globais
-├── errors/         ← páginas de erro (404, etc.)
-├── hooks/          ← hooks customizados
-├── i18n/           ← internacionalização
-├── layouts/        ← layouts base (sidebar, header, etc.)
-├── lib/            ← supabase.ts e utilitários
-├── pages/          ← páginas por módulo
-├── partials/       ← partes reutilizáveis de UI
-├── providers/      ← providers React (tema, etc.)
-└── routing/        ← definição de rotas React Router
+├── auth/                 ← providers, adapters, pages de login/register
+│   ├── adapters/         ← supabase-adapter.ts (a criar: laravel-adapter.ts)
+│   ├── context/          ← auth-context.ts + useAuth()
+│   ├── forms/            ← signin-schema.ts, signup-schema.ts
+│   ├── layouts/          ← branded.tsx, classic.tsx
+│   ├── lib/              ← models.ts, helpers.ts
+│   ├── pages/            ← signin-page.tsx, signup-page.tsx, etc.
+│   ├── providers/        ← supabase-provider.tsx
+│   ├── auth-routing.tsx
+│   ├── auth-routes.tsx
+│   └── require-auth.tsx
+├── components/           ← componentes reutilizáveis
+├── config/               ← configurações do app
+├── css/                  ← estilos globais
+├── errors/               ← páginas de erro (404, etc.)
+├── hooks/                ← hooks customizados
+├── i18n/                 ← internacionalização
+├── layouts/              ← demo1..demo10 (em uso: demo1)
+├── lib/                  ← supabase.ts e utilitários
+├── pages/                ← páginas por módulo
+├── partials/             ← partes reutilizáveis de UI
+├── providers/            ← providers React (tema, i18n, etc.)
+└── routing/              ← app-routing.tsx, app-routing-setup.tsx
 ```
 
 ---
@@ -152,7 +208,7 @@ src/
 |------|-----------|
 | **Fase 1** | Criar migration, model, request, controller (modules, people, users) ✅ |
 | **Fase 2** | Montar rotas (routes/api.php com prefixo `valsul/{module}`, sem prefixo /api) ✅ |
-| **Fase 3** | Login + tela |
+| **Fase 3** | Login + tela — backend ✅ (AuthController + Sanctum) / frontend pendente (substituir Supabase por Laravel adapter) |
 | **Fase 4** | Dashboard demonstração |
 | **Fase 5** | Tela padrão index (grid) |
 | **Fase 5.1** | Tela show/create/edit/delete/restore (página inteira) |
