@@ -16,6 +16,7 @@
 ## Repositório
 
 - **GitHub:** https://github.com/twoclicksbr/sc360-valsul.git
+- **CLAUDE.md (raw):** https://raw.githubusercontent.com/twoclicksbr/sc360-valsul/refs/heads/main/CLAUDE.md
 
 ---
 
