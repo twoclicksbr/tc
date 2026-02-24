@@ -9,6 +9,10 @@
 - **Gerentes de Projeto** — Usuário + Claude (claude.ai) → planejamento, escopo, arquitetura, specs
 - **Executor / Programador** — Claude Code → implementação, código, commits
 
+## Regras do Chat (claude.ai)
+
+- Não usar caixas de perguntas (widgets de seleção). Sempre perguntar em texto direto.
+
 ## Repositório
 
 - **GitHub:** https://github.com/twoclicksbr/sc360-valsul.git
