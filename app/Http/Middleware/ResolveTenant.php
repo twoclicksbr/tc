@@ -14,6 +14,11 @@ class ResolveTenant
     {
         $slug = $request->route('tenant');
 
+        if ($slug === 'admin') {
+            DB::setDefaultConnection('main');
+            return $next($request);
+        }
+
         $tenant = Tenant::where('slug', $slug)->first();
 
         if (! $tenant) {
