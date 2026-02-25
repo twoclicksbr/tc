@@ -12,6 +12,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 import { apiFetch, apiGet } from '@/lib/api';
 
 export interface TenantForEdit {
@@ -230,9 +231,11 @@ export function TenantModal({ open, onOpenChange, onSuccess, tenant }: TenantMod
               onCheckedChange={setActive}
               size="sm"
             />
-            <Label htmlFor="tenant-active" className="cursor-pointer">
-              Ativo
-            </Label>
+            {active ? (
+              <Badge variant="primary" appearance="light" size="sm">Ativo</Badge>
+            ) : (
+              <Badge variant="destructive" appearance="light" size="sm">Inativo</Badge>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <DialogClose asChild>
