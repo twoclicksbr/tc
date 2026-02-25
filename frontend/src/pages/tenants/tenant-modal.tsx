@@ -232,9 +232,9 @@ export function TenantModal({ open, onOpenChange, onSuccess, tenant }: TenantMod
               size="sm"
             />
             {active ? (
-              <Badge variant="primary" appearance="light" size="sm">Ativo</Badge>
+              <Badge variant="primary" appearance="light" size="sm" className="cursor-pointer" onClick={() => setActive(false)}>Ativo</Badge>
             ) : (
-              <Badge variant="destructive" appearance="light" size="sm">Inativo</Badge>
+              <Badge variant="destructive" appearance="light" size="sm" className="cursor-pointer" onClick={() => setActive(true)}>Inativo</Badge>
             )}
           </div>
           <div className="flex items-center gap-2">
