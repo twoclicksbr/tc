@@ -8,3 +8,9 @@ Execute os seguintes passos:
 4. Gerar uma mensagem de commit clara e descritiva baseada nas mudanças
 5. Executar: git add . && git commit -m "<mensagem gerada>" && git push
 6. Mostrar resumo do que foi feito
+
+## REGRA OBRIGATÓRIA — git add
+
+SEMPRE usar `git add .` para adicionar TODOS os arquivos modificados de uma vez.
+NUNCA selecionar arquivos manualmente (ex: `git add arquivo1 arquivo2`).
+O commit deve incluir tudo que aparece no `git status` (modified, new file, deleted).
