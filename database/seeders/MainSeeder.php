@@ -16,8 +16,8 @@ class MainSeeder extends Seeder
             [
                 'name'            => 'Valsul Auto Latas',
                 'db_name'         => 'valsul',
-                'db_user'         => 'valsul',
-                'db_password'     => Str::random(32),
+                'db_user'         => 'postgres',
+                'db_password'     => env('DB_PASSWORD', ''),
                 'expiration_date' => Carbon::today()->addDays(30),
                 'order'           => 1,
                 'active'          => true,
