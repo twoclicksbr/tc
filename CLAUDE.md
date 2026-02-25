@@ -9,9 +9,17 @@
 - **Gerentes de Projeto** — Usuário + Claude (claude.ai) → planejamento, escopo, arquitetura, specs
 - **Executor / Programador** — Claude Code → implementação, código, commits
 
+## Regras do Claude Code
+
+- NÃO executar /docs salvo quando explicitamente solicitado
+- NÃO atualizar CLAUDE.md em tarefas normais — apenas o comando /docs faz isso
+- NÃO fazer git add/commit/push — o git só é executado pelo comando /docs
+- Implementar SOMENTE o código solicitado na tarefa
+
 ## Regras do Chat (claude.ai)
 
 - Não usar caixas de perguntas (widgets de seleção). Sempre perguntar em texto direto.
+- Ao enviar prompts para o Claude Code, sempre envolver o prompt inteiro em um único bloco de código (``` ```) para que o usuário copie com um clique. Texto explicativo fica fora do bloco, antes ou depois.
 
 ## Repositório
 
@@ -97,10 +105,25 @@ Plataforma SaaS multi-tenant de gerenciamento para auto peças, desenvolvida em 
 
 ## Backend (Laravel)
 
+### PHP no ambiente local
+
+O comando `php` não está no PATH do sistema. Usar o binário do Herd diretamente:
+
+```
+/c/Users/alexa/.config/herd/bin/php84/php.exe artisan <comando>
+```
+
+Exemplos:
+```bash
+"/c/Users/alexa/.config/herd/bin/php84/php.exe" artisan migrate:fresh --database=main --path=database/migrations/main --seed
+"/c/Users/alexa/.config/herd/bin/php84/php.exe" artisan migrate:fresh --database=tenant --path=database/migrations/tenant --seed
+"/c/Users/alexa/.config/herd/bin/php84/php.exe" artisan route:list
+```
+
 ### Documentação da API
 
 - **URL local:** https://sc360.test/docs
-- **Regenerar:** `php artisan scribe:generate`
+- **Regenerar:** `"/c/Users/alexa/.config/herd/bin/php84/php.exe" artisan scribe:generate`
 
 ### Padrão de Tabelas
 

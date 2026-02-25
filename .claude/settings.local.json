@@ -38,7 +38,13 @@
       "Bash($PHP artisan db:seed)",
       "Bash(PGPASSWORD=Millena2012@ \"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -h 127.0.0.1 -d sc360_main -c \"SELECT id, name, slug, db_name, expiration_date, active FROM tenants;\")",
       "Bash(__NEW_LINE_3472ff23c59ac11c__ echo \"\")",
-      "Bash(__NEW_LINE_3472ff23c59ac11c__ PGPASSWORD=Millena2012@ \"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -h 127.0.0.1 -d sc360_valsul -c \"SELECT u.id, u.email, u.active, p.name FROM users u JOIN people p ON p.id = u.person_id;\")"
+      "Bash(__NEW_LINE_3472ff23c59ac11c__ PGPASSWORD=Millena2012@ \"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -h 127.0.0.1 -d sc360_valsul -c \"SELECT u.id, u.email, u.active, p.name FROM users u JOIN people p ON p.id = u.person_id;\")",
+      "Bash(\"/c/Users/alexa/.config/herd/bin/php84/php.exe\" artisan migrate:fresh --database=main --path=database/migrations/main --seed)",
+      "Bash(\"/c/Users/alexa/.config/herd/bin/php84/php.exe\" artisan migrate:fresh --database=tenant --path=database/migrations/tenant --seed)",
+      "Bash(\"/c/Users/alexa/.config/herd/bin/php84/php.exe\" artisan route:list --path=v1)",
+      "Bash(php artisan route:list)",
+      "Bash(/c/Users/Public/Herd/bin/php84/php.exe /c/Herd/sc360/artisan route:list)",
+      "Bash(\"/c/Users/alexa/.config/herd/bin/php84/php.exe\" /c/Herd/sc360/artisan route:list)"
     ]
   }
 }
