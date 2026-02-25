@@ -287,10 +287,9 @@ export function TenantsPage() {
             }),
           ),
         );
-        fetchData();
       } catch (err) {
         console.error('Erro ao reordenar:', err);
-        fetchData();
+        fetchData(); // Reverte ao estado real do banco em caso de falha
       }
     },
     [data, total, pagination, fetchData],
