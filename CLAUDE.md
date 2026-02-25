@@ -212,12 +212,46 @@ src/
 ├── errors/               ← páginas de erro (404, etc.)
 ├── hooks/                ← hooks customizados
 ├── i18n/                 ← internacionalização
-├── layouts/              ← demo1..demo10 (em uso: demo1)
+├── layouts/              ← demo1..demo10 (em uso: demo3)
 ├── lib/                  ← supabase.ts e utilitários
-├── pages/                ← páginas por módulo
+├── pages/                ← páginas por módulo (dashboard/, pessoas/, produtos/, compras/, vendas/, financeiro/, pagar/, receber/, configuracao/)
 ├── partials/             ← partes reutilizáveis de UI
 ├── providers/            ← providers React (tema, i18n, etc.)
 └── routing/              ← app-routing.tsx, app-routing-setup.tsx
+```
+
+### Rotas Frontend (`frontend/src/routing/app-routing-setup.tsx`)
+
+Todas as rotas do projeto ficam dentro de `<RequireAuth>` + `<Demo3Layout>`.
+
+| Rota | Componente | Descrição |
+|------|-----------|-----------|
+| `/` | `Navigate to="/dashboard"` | Redireciona para dashboard |
+| `/dashboard` | `DashboardPage` | Dashboard geral (placeholder) |
+| `/pessoas` | `PessoasPage` | Cadastro de pessoas (placeholder) |
+| `/produtos` | `ProdutosPage` | Produtos (placeholder) |
+| `/compras` | `ComprasPage` | Compras (placeholder) |
+| `/vendas` | `VendasPage` | Vendas (placeholder) |
+| `/financeiro` | `FinanceiroPage` | Financeiro (placeholder) |
+| `/pagar` | `PagarPage` | Contas a pagar (placeholder) |
+| `/receber` | `ReceberPage` | Contas a receber (placeholder) |
+| `/configuracao` | `ConfiguracaoPage` | Configurações (placeholder) |
+
+### Navbar (`frontend/src/layouts/demo3/components/navbar-menu.tsx`)
+
+O menu horizontal do Demo3 tem um item fixo "Dashboard" como primeiro item (hardcoded no componente), seguido dos itens dinâmicos do `MENU_SIDEBAR[3]` (Account, Billing, Security, etc. — legado Metronic).
+
+**Dropdown Dashboard:**
+- Geral → `/dashboard`
+- Pessoas → `/pessoas`
+- Produtos → `/produtos`
+- Comercial → `/comercial`
+- Financeiro → `/financeiro`
+
+### Vite Config (`frontend/vite.config.ts`)
+
+```ts
+server: { host: 'sc360.test', port: 5173, https: false }
 ```
 
 ---
@@ -229,7 +263,7 @@ src/
 | **Fase 1** | Criar migration, model, request, controller (modules, people, users) ✅ |
 | **Fase 2** | Montar rotas (routes/api.php com prefixo `valsul/{module}`, sem prefixo /api) ✅ |
 | **Fase 3** | Login + tela — backend ✅ (AuthController + Sanctum) / frontend ✅ (laravel-adapter.ts + laravel-provider.tsx implementados) |
-| **Fase 4** | Dashboard demonstração |
+| **Fase 4** | Dashboard demonstração — placeholder criado (`/dashboard`, página "Em desenvolvimento") ✅ |
 | **Fase 5** | Tela padrão index (grid) |
 | **Fase 5.1** | Tela show/create/edit/delete/restore (página inteira) |
 | **Fase 5.2** | Tela show/create/edit/delete/restore (modal) |
