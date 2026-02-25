@@ -3,13 +3,15 @@ import {
   ColumnDef,
   getCoreRowModel,
   PaginationState,
+  RowSelectionState,
   SortingState,
   useReactTable,
 } from '@tanstack/react-table';
-import { ChevronUp, ChevronDown, ChevronsUpDown, Download, Pencil, Trash2 } from 'lucide-react';
+import { ChevronUp, ChevronDown, ChevronsUpDown, Download, GripVertical, Pencil, Trash2 } from 'lucide-react';
 import { Container } from '@/components/common/container';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { DataGrid, DataGridContainer } from '@/components/ui/data-grid';
 import { DataGridPagination } from '@/components/ui/data-grid-pagination';
 import { DataGridTable } from '@/components/ui/data-grid-table';
@@ -49,6 +51,42 @@ function SortIcon({ sorted }: { sorted: false | 'asc' | 'desc' }) {
 }
 
 const columns: ColumnDef<Tenant>[] = [
+  {
+    id: 'drag',
+    size: 40,
+    header: () => null,
+    cell: () => (
+      <span className="flex items-center justify-center cursor-grab text-muted-foreground">
+        <GripVertical className="size-4" />
+      </span>
+    ),
+    meta: { skeleton: <span className="block w-4 h-4" /> },
+  },
+  {
+    id: 'select',
+    size: 40,
+    header: ({ table }) => (
+      <Checkbox
+        checked={
+          table.getIsAllPageRowsSelected()
+            ? true
+            : table.getIsSomePageRowsSelected()
+              ? 'indeterminate'
+              : false
+        }
+        onCheckedChange={(v) => table.toggleAllPageRowsSelected(!!v)}
+        aria-label="Selecionar todos"
+      />
+    ),
+    cell: ({ row }) => (
+      <Checkbox
+        checked={row.getIsSelected()}
+        onCheckedChange={(v) => row.toggleSelected(!!v)}
+        aria-label="Selecionar linha"
+      />
+    ),
+    meta: { skeleton: <Skeleton className="h-4 w-4" /> },
+  },
   {
     accessorKey: 'id',
     size: 70,
@@ -159,6 +197,7 @@ export function TenantsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [sorting, setSorting] = useState<SortingState>([{ id: 'id', desc: false }]);
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 10 });
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -186,7 +225,9 @@ export function TenantsPage() {
     data,
     columns,
     pageCount: Math.ceil(total / pagination.pageSize) || 1,
-    state: { pagination, sorting },
+    state: { pagination, sorting, rowSelection },
+    onRowSelectionChange: setRowSelection,
+    enableRowSelection: true,
     onPaginationChange: (updater) => {
       const next = typeof updater === 'function' ? updater(pagination) : updater;
       setPagination(next);
