@@ -331,7 +331,7 @@ Garante retorno 401 JSON para requisições não autenticadas. Sem isso, o Larav
 | Seeder | O que faz |
 |--------|-----------|
 | `DatabaseSeeder` | Chama MainSeeder + AdminSeeder |
-| `MainSeeder` | Cria tenant 'valsul' em sc360_main; cria módulo 'tenants' em sc360_main (via `Module::on('main')`) |
+| `MainSeeder` | Cria tenant configurável via `env('TENANT_SEED_SLUG', 'demo')` + `env('TENANT_SEED_NAME', 'Demo Tenant')` em sc360_main; cria módulo 'tenants' em sc360_main (via `Module::on('main')`) |
 | `AdminSeeder` | Cria person 'Admin' + user admin@admin.com na conexão default atual (main ou tenant) |
 
 **Comandos para rodar:**
@@ -362,7 +362,7 @@ VITE_APP_VERSION=9.2.6
 
 ## Laravel API
 VITE_API_URL=https://api.sc360.test
-VITE_TENANT_SLUG=valsul
+VITE_TENANT_SLUG=demo
 
 ## Supabase Configuration (placeholder — não utilizado)
 VITE_SUPABASE_URL=your_supabase_url
@@ -463,8 +463,8 @@ Wrapper centralizado para chamadas à API Laravel. Injeta `Authorization: Bearer
 ```ts
 getTenantSlug(): string
 ```
-- Detecta o tenant pelo subdomínio: `valsul.sc360.test` → `'valsul'`
-- Fallback para `VITE_TENANT_SLUG` quando hostname tem menos de 3 partes (ex: `localhost`)
+- Detecta o tenant pelo subdomínio: `demo.sc360.test` → `'demo'`
+- Fallback para `VITE_TENANT_SLUG` quando hostname tem menos de 3 partes (ex: `localhost`); se `VITE_TENANT_SLUG` não estiver definido, loga erro e retorna `''`
 - Usado em `laravel-adapter.ts` para montar as URLs da API dinamicamente
 
 ### Vite Config (`frontend/vite.config.ts`)

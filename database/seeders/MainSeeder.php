@@ -11,11 +11,13 @@ class MainSeeder extends Seeder
 {
     public function run(): void
     {
+        $slug = env('TENANT_SEED_SLUG', 'demo');
+
         Tenant::firstOrCreate(
-            ['slug' => 'valsul'],
+            ['slug' => $slug],
             [
-                'name'            => 'Valsul Auto Latas',
-                'db_name'         => 'valsul',
+                'name'            => env('TENANT_SEED_NAME', 'Demo Tenant'),
+                'db_name'         => str_replace('-', '_', $slug),
                 'db_user'         => 'postgres',
                 'db_password'     => env('DB_PASSWORD', ''),
                 'expiration_date' => Carbon::today()->addDays(30),

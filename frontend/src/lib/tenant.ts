@@ -6,5 +6,10 @@ export function getTenantSlug(): string {
     return parts[0];
   }
 
-  return (import.meta.env.VITE_TENANT_SLUG as string) ?? 'valsul';
+  const slug = import.meta.env.VITE_TENANT_SLUG as string;
+  if (!slug) {
+    console.error('[getTenantSlug] VITE_TENANT_SLUG não definido no .env');
+    return '';
+  }
+  return slug;
 }

@@ -116,7 +116,7 @@ return [
             'driver'         => 'pgsql',
             'host'           => env('DB_HOST', '127.0.0.1'),
             'port'           => env('DB_PORT', '5432'),
-            'database'       => env('TENANT_DB', 'sc360_valsul'),
+            'database'       => env('TENANT_DB', 'sc360_tenant'),
             'username'       => env('TENANT_DB_USERNAME', 'postgres'),
             'password'       => env('TENANT_DB_PASSWORD', ''),
             'charset'        => 'utf8',
