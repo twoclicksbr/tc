@@ -41,9 +41,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, []);
 
   const login = async (email: string, password: string) => {
-    const { auth: newAuth, user } = await LaravelAdapter.login(email, password);
+    const { auth: newAuth } = await LaravelAdapter.login(email, password);
     saveAuth(newAuth);
-    setCurrentUser(user);
+    const user = await LaravelAdapter.me(newAuth.access_token);
+    if (user) {
+      setCurrentUser(user);
+    }
   };
 
   const logout = async () => {
