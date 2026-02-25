@@ -15,10 +15,12 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DataGrid, DataGridContainer } from '@/components/ui/data-grid';
 import { DataGridPagination } from '@/components/ui/data-grid-pagination';
-import { DataGridTable } from '@/components/ui/data-grid-table';
+import { DataGridTableDndRows } from '@/components/ui/data-grid-table-dnd-rows';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { apiGet } from '@/lib/api';
+import { apiGet, apiPut } from '@/lib/api';
+import { type DragEndEvent, type UniqueIdentifier } from '@dnd-kit/core';
+import { arrayMove, useSortable } from '@dnd-kit/sortable';
 
 interface Tenant {
   id: number;
@@ -27,6 +29,7 @@ interface Tenant {
   db_name: string;
   expiration_date: string | null;
   active: boolean;
+  order: number;
   created_at: string;
   updated_at: string;
 }
@@ -53,17 +56,26 @@ function SortIcon({ sorted }: { sorted: false | 'asc' | 'desc' }) {
   return <ChevronsUpDown className="size-3.5 opacity-40" />;
 }
 
+function DragHandle({ rowId }: { rowId: string }) {
+  const { attributes, listeners } = useSortable({ id: rowId });
+  return (
+    <span
+      className="flex items-center justify-center cursor-grab active:cursor-grabbing text-muted-foreground"
+      {...attributes}
+      {...listeners}
+    >
+      <GripVertical className="size-4" />
+    </span>
+  );
+}
+
 function buildColumns(onEdit: (tenant: TenantForEdit) => void): ColumnDef<Tenant>[] {
   return [
     {
       id: 'drag',
       size: 40,
       header: () => null,
-      cell: () => (
-        <span className="flex items-center justify-center cursor-grab text-muted-foreground">
-          <GripVertical className="size-4" />
-        </span>
-      ),
+      cell: ({ row }) => <DragHandle rowId={row.id} />,
       meta: { skeleton: <span className="block w-4 h-4" /> },
     },
     {
@@ -200,7 +212,7 @@ export function TenantsPage() {
   const [data, setData] = useState<Tenant[]>([]);
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [sorting, setSorting] = useState<SortingState>([{ id: 'id', desc: false }]);
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'order', desc: true }]);
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 10 });
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [modalOpen, setModalOpen] = useState(false);
@@ -210,7 +222,7 @@ export function TenantsPage() {
     setIsLoading(true);
     try {
       const { pageIndex, pageSize } = pagination;
-      const sort = sorting[0]?.id ?? 'id';
+      const sort = sorting[0]?.id ?? 'order';
       const direction = sorting[0]?.desc ? 'desc' : 'asc';
       const res = await apiGet<TenantsResponse>(
         `/v1/admin/tenants?page=${pageIndex + 1}&per_page=${pageSize}&sort=${sort}&direction=${direction}`,
@@ -238,6 +250,46 @@ export function TenantsPage() {
     if (!open) setSelectedTenant(null);
   }, []);
 
+  const handleDragEnd = useCallback(
+    async (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (!over || active.id === over.id) return;
+
+      const oldIndex = parseInt(active.id as string);
+      const newIndex = parseInt(over.id as string);
+      const newData = arrayMove(data, oldIndex, newIndex);
+
+      // Item at position 0 gets the highest order value
+      const baseOrder = total - pagination.pageIndex * pagination.pageSize;
+      const newDataWithOrders = newData.map((item, i) => ({
+        ...item,
+        order: baseOrder - i,
+      }));
+
+      // Optimistic update for instant visual feedback
+      setData(newDataWithOrders);
+
+      // Find only items whose order actually changed
+      const orderMap = new Map(data.map((item) => [item.id, item.order ?? 0]));
+      const changedItems = newDataWithOrders.filter(
+        (item) => item.order !== orderMap.get(item.id),
+      );
+
+      try {
+        await Promise.all(
+          changedItems.map((item) =>
+            apiPut<unknown>(`/v1/admin/tenants/${item.id}`, { order: item.order }),
+          ),
+        );
+        fetchData();
+      } catch (err) {
+        console.error('Erro ao reordenar:', err);
+        fetchData();
+      }
+    },
+    [data, total, pagination, fetchData],
+  );
+
   const columns = useMemo(() => buildColumns(handleEdit), [handleEdit]);
 
   const table = useReactTable<Tenant>({
@@ -261,6 +313,13 @@ export function TenantsPage() {
     manualSorting: true,
   });
 
+  // Row IDs used by dnd-kit — React Table uses string indices ("0", "1", ...)
+  const dataIds = useMemo<UniqueIdentifier[]>(
+    () => table.getRowModel().rows.map((row) => row.id),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [data],
+  );
+
   return (
     <Fragment>
       <Container>
@@ -272,8 +331,8 @@ export function TenantsPage() {
           </div>
         </div>
         <DataGridContainer>
-          <DataGrid table={table} recordCount={total} isLoading={isLoading}>
-            <DataGridTable />
+          <DataGrid table={table} recordCount={total} isLoading={isLoading} loadingMode="skeleton">
+            <DataGridTableDndRows handleDragEnd={handleDragEnd} dataIds={dataIds} />
             <div className="border-t px-4 py-3">
               <DataGridPagination />
             </div>
