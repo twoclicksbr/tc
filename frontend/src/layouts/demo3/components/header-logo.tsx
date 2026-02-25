@@ -56,12 +56,12 @@ export function HeaderLogo() {
 
         <Link to="/" className="mx-1">
           <img
-            src={toAbsoluteUrl('/media/app/mini-logo-primary.svg')}
+            src={toAbsoluteUrl('/media/logos/ICO-Light.svg')}
             className="dark:hidden min-h-[24px]"
             alt="logo"
           />
           <img
-            src={toAbsoluteUrl('/media/app/mini-logo-primary-dark.svg')}
+            src={toAbsoluteUrl('/media/logos/ICO-Dark.svg')}
             className="hidden dark:inline-block min-h-[24px]"
             alt="logo"
           />
