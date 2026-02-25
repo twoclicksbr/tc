@@ -1,33 +1,32 @@
-Leia o arquivo Claude.md na raiz do projeto antes de qualquer ação.
+# /docs — Sincronizar CLAUDE.md com o projeto
 
-Execute os seguintes passos:
+## Regras
+- Este comando é o ÚNICO momento em que se faz git commit/push
+- NÃO alterar nenhum arquivo de código — apenas CLAUDE.md
 
-1. Escanear o backend (Laravel):
-   - Listar todas as migrations em database/migrations/
-   - Listar todos os models em app/Models/
-   - Listar todas as requests em app/Http/Requests/
-   - Listar todos os controllers em app/Http/Controllers/
-   - Listar todas as rotas com: php artisan route:list
-   - Verificar estrutura de pastas do projeto
+## Fluxo
 
-2. Escanear o frontend (Metronic React):
-   - Listar páginas em frontend/src/pages/
-   - Verificar layouts em frontend/src/layouts/
-   - Verificar configuração do frontend/vite.config.ts
-   - Verificar frontend/src/auth/ (adapter e provider em uso)
-   - Verificar frontend/src/routing/ (rotas definidas)
+### 1. Ver o que mudou
+```bash
+git status
+git diff
+git diff --staged
+```
 
-3. Comparar com o que está documentado no Claude.md (seções Backend e Frontend)
+### 2. Analisar as mudanças
+- Ler o diff de cada arquivo modificado
+- Identificar o que foi adicionado, removido ou alterado
+- Comparar com o que está documentado no CLAUDE.md
 
-4. Atualizar o Claude.md com as diferenças encontradas:
-   - Tabelas criadas que não estão documentadas
-   - Campos que mudaram
-   - Novos arquivos ou módulos no backend
-   - Mudanças de configuração no frontend (vite, auth, rotas)
-   - Qualquer divergência entre código e documentação
+### 3. Atualizar CLAUDE.md
+- Adicionar features novas
+- Corrigir informações desatualizadas
+- Remover documentação de código que não existe mais
+- Manter o formato e estrutura existente do CLAUDE.md
 
-5. Manter a formatação e estrutura do Claude.md (seções Backend / Frontend separadas)
-
-6. Mostrar resumo das alterações feitas
-
-7. Executar: git add . && git commit -m "docs: sync Claude.md with project" && git push
+### 4. Commit e push
+```bash
+git add .
+git commit -m "docs: sync CLAUDE.md with project"
+git push
+```
