@@ -197,11 +197,22 @@ Resposta do login:
 | `allowed_headers` | `['Content-Type', 'Authorization', 'Accept', 'X-Requested-With']` |
 | `supports_credentials` | `true` |
 
+### Requests (`app/Http/Requests/`)
+
+| Request | Módulo |
+|---------|--------|
+| `TenantRequest` | Validação de tenants |
+| `PersonRequest` | Validação de pessoas |
+| `UserRequest` | Validação de usuários |
+| `ModuleRequest` | Validação de módulos |
+
 ### Padrão de Desenvolvimento
 
 #### Controller Genérica
 
 Uma única `ModuleController` resolve o CRUD de qualquer módulo. Ela busca as configurações na tabela `modules` (model, request, etc.) e executa dinamicamente. Somente em casos extremos se cria uma controller específica.
+
+> **Atenção — binding de parâmetro:** O Laravel faz injeção posicional para tipos primitivos (`string`). Quando a rota tem múltiplos parâmetros (`{tenant}` + `{module}`), `string $module` receberia o valor de `{tenant}`. A solução é usar `$request->route('module')` em todos os métodos. Todos os métodos do `ModuleController` recebem `Request $request` como primeiro parâmetro e obtêm o módulo via `$request->route('module')`.
 
 #### Rota Genérica
 
@@ -236,11 +247,19 @@ $middleware->prependToPriorityList(
 ```
 O Laravel reordena middleware por prioridade. Sem isso, `auth:sanctum` rodaria antes do `resolve.tenant`, causando 401.
 
+**Handler de Exceções** (`bootstrap/app.php`):
+```php
+$exceptions->render(function (\Illuminate\Auth\AuthenticationException $e, $request) {
+    return response()->json(['message' => 'Unauthenticated.'], 401);
+});
+```
+Garante retorno 401 JSON para requisições não autenticadas. Sem isso, o Laravel tenta redirecionar para `route('login')` (que não existe nesta API), causando 500.
+
 ### Models (`app/Models/`)
 
 | Model | Conexão | Observação |
 |-------|---------|-----------|
-| `Tenant` | `main` (explícita) | Sempre usa sc360_main |
+| `Tenant` | `main` (explícita) | Sempre usa sc360_main; `$hidden = ['db_password']` |
 | `User` | default (dinâmica) | Usa a conexão setada pelo middleware |
 | `Person` | default (dinâmica) | Usa a conexão setada pelo middleware |
 | `Module` | default (dinâmica) | Usa a conexão setada pelo middleware |
@@ -362,7 +381,7 @@ src/
 
 ### Rotas Frontend (`frontend/src/routing/app-routing-setup.tsx`)
 
-Todas as rotas do projeto ficam dentro de `<RequireAuth>` + `<Demo3Layout>`.
+O arquivo contém as rotas do Metronic boilerplate (account, network, store, public-profile, etc.) além das rotas do projeto. As rotas do projeto ficam dentro de `<RequireAuth>` + `<Demo3Layout>`.
 
 | Rota | Componente | Descrição |
 |------|-----------|-----------|
