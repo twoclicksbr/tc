@@ -117,6 +117,12 @@ id → campos específicos → order (default 1) → active (default true) → t
 | Tabela | Campos |
 |--------|--------|
 | `tenants` | name, slug (unique), db_name, db_user, db_password (encrypted), expiration_date, order, active |
+| `people` | name, birth_date, order, active |
+| `users` | person_id (FK people), email, password, active |
+| `modules` | (mesmos campos que tenant — ver seção Configuração) |
+| `personal_access_tokens` | tokenable_type, tokenable_id, name, token, abilities, last_used_at, expires_at |
+
+> **Nota:** `sc360_main` tem as mesmas tabelas operacionais que os bancos tenant (`people`, `users`, `modules`, `personal_access_tokens`) para suportar a autenticação e CRUD do landlord admin via `/v1/admin/`.
 
 #### Principais (por tenant)
 
@@ -167,11 +173,13 @@ Campos `after_*` são combobox com opções: `index`, `show`, `create`, `edit`.
 
 Controller: `AuthController` — rotas públicas e protegidas por `auth:sanctum`.
 
+O `{tenant}` pode ser qualquer slug de tenant (ex: `valsul`) ou `admin` (acessa `sc360_main`).
+
 | Método | URL | Descrição | Auth |
 |--------|-----|-----------|------|
-| POST | `api.{domínio}/valsul/auth/login` | Login → retorna token + user | Público |
-| POST | `api.{domínio}/valsul/auth/logout` | Logout → revoga token atual | Bearer |
-| GET | `api.{domínio}/valsul/auth/me` | Retorna usuário autenticado com `person` | Bearer |
+| POST | `api.{domínio}/v1/{tenant}/auth/login` | Login → retorna token + user | Público |
+| POST | `api.{domínio}/v1/{tenant}/auth/logout` | Logout → revoga token atual | Bearer |
+| GET | `api.{domínio}/v1/{tenant}/auth/me` | Retorna usuário autenticado com `person` | Bearer |
 
 Resposta do login:
 ```json
@@ -182,9 +190,10 @@ Resposta do login:
 
 | Chave | Valor |
 |-------|-------|
-| `paths` | `['api/*', 'valsul/*', 'sanctum/csrf-cookie']` |
+| `paths` | `['api/*', 'v1/*', 'sanctum/csrf-cookie']` |
 | `allowed_methods` | `['*']` |
-| `allowed_origins` | `['http://sc360.test:5173', 'http://localhost:5173']` |
+| `allowed_origins` | `['http://localhost:5173']` |
+| `allowed_origins_patterns` | `['#^https?://.*\.sc360\.test(:\d+)?$#']` (todos os subdomínios) |
 | `allowed_headers` | `['Content-Type', 'Authorization', 'Accept', 'X-Requested-With']` |
 | `supports_credentials` | `true` |
 
@@ -212,6 +221,69 @@ Os campos `model`, `request`, `controller_front` e `controller_back` são combob
 
 Sem mexer em rotas, sem criar controller de CRUD. Tudo dinâmico.
 
+### Middleware Multi-Tenancy (`app/Http/Middleware/ResolveTenant.php`)
+
+Resolve a conexão do banco com base no `{tenant}` da URL:
+- `{tenant} = 'admin'` → `DB::setDefaultConnection('main')` (banco `sc360_main`)
+- `{tenant} = qualquer slug` → configura conexão 'tenant' para `sc360_{db_name}` e define como default
+
+**Prioridade de Middleware** (`bootstrap/app.php`):
+```php
+$middleware->prependToPriorityList(
+    \Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests::class,
+    \App\Http\Middleware\ResolveTenant::class,
+);
+```
+O Laravel reordena middleware por prioridade. Sem isso, `auth:sanctum` rodaria antes do `resolve.tenant`, causando 401.
+
+### Models (`app/Models/`)
+
+| Model | Conexão | Observação |
+|-------|---------|-----------|
+| `Tenant` | `main` (explícita) | Sempre usa sc360_main |
+| `User` | default (dinâmica) | Usa a conexão setada pelo middleware |
+| `Person` | default (dinâmica) | Usa a conexão setada pelo middleware |
+| `Module` | default (dinâmica) | Usa a conexão setada pelo middleware |
+| `PersonalAccessToken` | via `getConnectionName()` | Retorna `DB::getDefaultConnection()` — garante que Sanctum use a conexão correta |
+
+### Migrations por banco
+
+**`database/migrations/main/`** — roda com `--database=main --path=database/migrations/main`
+
+| Migration | Cria |
+|-----------|------|
+| `0001_01_01_000000` | password_reset_tokens, sessions |
+| `0001_01_01_000001` | cache, cache_locks |
+| `0001_01_01_000002` | jobs, job_batches, failed_jobs |
+| `2025_02_24_000004` | tenants |
+| `2025_02_24_000005` | people |
+| `2025_02_24_000006` | users (com person_id FK) |
+| `2025_02_24_000007` | personal_access_tokens |
+| `2025_02_24_000008` | modules |
+
+**`database/migrations/tenant/`** — roda com `--database=tenant --path=database/migrations/tenant`
+
+| Migration | Cria |
+|-----------|------|
+| `2025_02_24_000001` | modules |
+| `2025_02_24_000002` | people |
+| `2025_02_24_000003` | users (com person_id FK) |
+| `2026_02_24_213424` | personal_access_tokens |
+
+### Seeders (`database/seeders/`)
+
+| Seeder | O que faz |
+|--------|-----------|
+| `DatabaseSeeder` | Chama MainSeeder + AdminSeeder |
+| `MainSeeder` | Cria tenant 'valsul' em sc360_main; cria módulo 'tenants' em sc360_main (via `Module::on('main')`) |
+| `AdminSeeder` | Cria person 'Admin' + user admin@admin.com na conexão default atual (main ou tenant) |
+
+**Comandos para rodar:**
+```bash
+php artisan migrate:fresh --database=main --path=database/migrations/main --seed
+php artisan migrate:fresh --database=tenant --path=database/migrations/tenant --seed
+```
+
 ---
 
 ## Frontend (Metronic React)
@@ -233,7 +305,8 @@ VITE_APP_NAME=metronic-tailwind-react
 VITE_APP_VERSION=9.2.6
 
 ## Laravel API
-VITE_API_URL=http://api.sc360.test
+VITE_API_URL=https://api.sc360.test
+VITE_TENANT_SLUG=valsul
 
 ## Supabase Configuration (placeholder — não utilizado)
 VITE_SUPABASE_URL=your_supabase_url
@@ -241,11 +314,13 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 VITE_SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 ```
 
+> `VITE_TENANT_SLUG` é fallback para desenvolvimento local em `localhost` (sem subdomínio). Em produção/dev com subdomínio, o tenant é detectado automaticamente via `getTenantSlug()`.
+
 ### Auth (Laravel Sanctum) — estrutura em `frontend/src/auth/`
 
 | Arquivo | Descrição |
 |---------|-----------|
-| `adapters/laravel-adapter.ts` | Adapter Laravel — login/logout/me via `VITE_API_URL` |
+| `adapters/laravel-adapter.ts` | Adapter Laravel — login/logout/me via `VITE_API_URL` + `getTenantSlug()` |
 | `adapters/supabase-adapter.ts` | Adapter Supabase (legado — mantido, não utilizado) |
 | `providers/laravel-provider.tsx` | `AuthProvider` em uso — expõe `login`, `logout`, `getUser`, etc. via context |
 | `providers/supabase-provider.tsx` | Provider Supabase (legado — mantido, não utilizado) |
@@ -278,7 +353,7 @@ src/
 ├── hooks/                ← hooks customizados
 ├── i18n/                 ← internacionalização
 ├── layouts/              ← demo1..demo10 (em uso: demo3)
-├── lib/                  ← supabase.ts e utilitários
+├── lib/                  ← supabase.ts, tenant.ts e utilitários
 ├── pages/                ← páginas por módulo (dashboard/, pessoas/, produtos/, compras/, vendas/, financeiro/, pagar/, receber/, configuracao/)
 ├── partials/             ← partes reutilizáveis de UI
 ├── providers/            ← providers React (tema, i18n, etc.)
@@ -313,11 +388,22 @@ O menu horizontal do Demo3 tem um item fixo "Dashboard" como primeiro item (hard
 - Comercial → `/comercial`
 - Financeiro → `/financeiro`
 
+### Tenant Detection (`frontend/src/lib/tenant.ts`)
+
+```ts
+getTenantSlug(): string
+```
+- Detecta o tenant pelo subdomínio: `valsul.sc360.test` → `'valsul'`
+- Fallback para `VITE_TENANT_SLUG` quando hostname tem menos de 3 partes (ex: `localhost`)
+- Usado em `laravel-adapter.ts` para montar as URLs da API dinamicamente
+
 ### Vite Config (`frontend/vite.config.ts`)
 
 ```ts
-server: { host: 'sc360.test', port: 5173, https: false }
+server: { host: '0.0.0.0', port: 5173, https: false, allowedHosts: ['.sc360.test'] }
 ```
+- `host: '0.0.0.0'` — responde em qualquer subdomínio em dev
+- `allowedHosts: ['.sc360.test']` — permite todos os subdomínios `*.sc360.test`
 
 ---
 
@@ -326,8 +412,8 @@ server: { host: 'sc360.test', port: 5173, https: false }
 | Fase | Descrição |
 |------|-----------|
 | **Fase 1** | Criar migration, model, request, controller (modules, people, users) ✅ |
-| **Fase 2** | Montar rotas (routes/api.php com prefixo `valsul/{module}`, sem prefixo /api) ✅ |
-| **Fase 3** | Login + tela — backend ✅ (AuthController + Sanctum) / frontend ✅ (laravel-adapter.ts + laravel-provider.tsx implementados) |
+| **Fase 2** | Montar rotas (routes/api.php com prefixo `v1/{tenant}/{module}`, sem prefixo /api) ✅ |
+| **Fase 3** | Login + tela — backend ✅ (AuthController + Sanctum, multi-tenant + admin) / frontend ✅ (laravel-adapter.ts + laravel-provider.tsx + getTenantSlug() implementados) |
 | **Fase 4** | Dashboard demonstração — placeholder criado (`/dashboard`, página "Em desenvolvimento") ✅ |
 | **Fase 5** | Tela padrão index (grid) |
 | **Fase 5.1** | Tela show/create/edit/delete/restore (página inteira) |
