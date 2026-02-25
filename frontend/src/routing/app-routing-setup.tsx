@@ -3,6 +3,7 @@ import { RequireAuth } from '@/auth/require-auth';
 import { ErrorRouting } from '@/errors/error-routing';
 import { Demo3Layout } from '@/layouts/demo3/layout';
 import { PessoasPage } from '@/pages/pessoas/page';
+import { ProdutosPage } from '@/pages/produtos/page';
 import { ComprasPage } from '@/pages/compras/page';
 import { VendasPage } from '@/pages/vendas/page';
 import { FinanceiroPage } from '@/pages/financeiro/page';
@@ -388,6 +389,7 @@ export function AppRoutingSetup() {
           />
           <Route path="/auth/get-started" element={<AccountGetStartedPage />} />
           <Route path="/pessoas" element={<PessoasPage />} />
+          <Route path="/produtos" element={<ProdutosPage />} />
           <Route path="/compras" element={<ComprasPage />} />
           <Route path="/vendas" element={<VendasPage />} />
           <Route path="/financeiro" element={<FinanceiroPage />} />

@@ -2,6 +2,7 @@ import {
   ArrowDownCircle,
   ArrowUpCircle,
   BarChart3,
+  Package,
   Settings,
   ShoppingCart,
   TrendingUp,
@@ -28,6 +29,7 @@ export function SidebarMenu() {
 
   const items: Item[] = [
     { icon: Users,            path: '/pessoas',      title: 'Pessoas' },
+    { icon: Package,          path: '/produtos',     title: 'Produtos' },
     { icon: ShoppingCart,     path: '/compras',      title: 'Compras' },
     { icon: TrendingUp,       path: '/vendas',       title: 'Vendas' },
     { icon: BarChart3,        path: '/financeiro',   title: 'Financeiro' },
