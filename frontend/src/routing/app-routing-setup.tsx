@@ -1,7 +1,14 @@
 import { AuthRouting } from '@/auth/auth-routing';
 import { RequireAuth } from '@/auth/require-auth';
 import { ErrorRouting } from '@/errors/error-routing';
-import { Demo1Layout } from '@/layouts/demo1/layout';
+import { Demo3Layout } from '@/layouts/demo3/layout';
+import { PessoasPage } from '@/pages/pessoas/page';
+import { ComprasPage } from '@/pages/compras/page';
+import { VendasPage } from '@/pages/vendas/page';
+import { FinanceiroPage } from '@/pages/financeiro/page';
+import { PagarPage } from '@/pages/pagar/page';
+import { ReceberPage } from '@/pages/receber/page';
+import { ConfiguracaoPage } from '@/pages/configuracao/page';
 import {
   AccountActivityPage,
   AccountAllowedIPAddressesPage,
@@ -98,7 +105,7 @@ export function AppRoutingSetup() {
   return (
     <Routes>
       <Route element={<RequireAuth />}>
-        <Route element={<Demo1Layout />}>
+        <Route element={<Demo3Layout />}>
           <Route path="/" element={<DefaultPage />} />
           <Route path="/dark-sidebar" element={<Demo1DarkSidebarPage />} />
           <Route
@@ -380,6 +387,13 @@ export function AppRoutingSetup() {
             element={<AllProductsPage />}
           />
           <Route path="/auth/get-started" element={<AccountGetStartedPage />} />
+          <Route path="/pessoas" element={<PessoasPage />} />
+          <Route path="/compras" element={<ComprasPage />} />
+          <Route path="/vendas" element={<VendasPage />} />
+          <Route path="/financeiro" element={<FinanceiroPage />} />
+          <Route path="/pagar" element={<PagarPage />} />
+          <Route path="/receber" element={<ReceberPage />} />
+          <Route path="/configuracao" element={<ConfiguracaoPage />} />
         </Route>
       </Route>
       <Route path="error/*" element={<ErrorRouting />} />
