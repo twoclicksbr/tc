@@ -305,7 +305,7 @@ export function GenericGrid({
       const newData  = arrayMove(data, oldIndex, newIndex);
 
       const baseOrder        = total - pagination.pageIndex * pagination.pageSize;
-      const newDataWithOrders = newData.map((item, i) => ({ ...item, order: baseOrder - i }));
+      const newDataWithOrders = newData.map((item, i) => ({ ...item, order: baseOrder - i } as AnyRecord));
 
       // Optimistic update
       setData(newDataWithOrders);
