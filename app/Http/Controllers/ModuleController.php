@@ -59,6 +59,26 @@ class ModuleController extends Controller
         ]);
     }
 
+    public function checkSlug(Request $request): JsonResponse
+    {
+        $mod        = $this->resolveModule($request->route('module'));
+        $modelClass = $this->modelClass($mod);
+        $slug       = $request->input('slug', '');
+        $excludeId  = $request->input('exclude_id');
+
+        if ($slug === '') {
+            return response()->json(['available' => false]);
+        }
+
+        $query = $modelClass::where('slug', $slug);
+
+        if ($excludeId) {
+            $query->where('id', '!=', (int) $excludeId);
+        }
+
+        return response()->json(['available' => ! $query->exists()]);
+    }
+
     public function show(Request $request): JsonResponse
     {
         $mod        = $this->resolveModule($request->route('module'));
