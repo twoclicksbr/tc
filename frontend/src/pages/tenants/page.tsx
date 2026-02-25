@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useEffect, useState } from 'react';
+import { TenantModal } from './tenant-modal';
 import {
   ColumnDef,
   getCoreRowModel,
@@ -198,6 +199,7 @@ export function TenantsPage() {
   const [sorting, setSorting] = useState<SortingState>([{ id: 'id', desc: false }]);
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 10 });
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [modalOpen, setModalOpen] = useState(false);
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -249,7 +251,7 @@ export function TenantsPage() {
           <h1 className="text-xl font-semibold">Tenants</h1>
           <div className="flex items-center gap-2">
             <Button size="sm" variant="outline"><Download className="size-4" />Export</Button>
-            <Button size="sm">Novo</Button>
+            <Button size="sm" onClick={() => setModalOpen(true)}>Novo</Button>
           </div>
         </div>
         <DataGridContainer>
@@ -261,6 +263,12 @@ export function TenantsPage() {
           </DataGrid>
         </DataGridContainer>
       </Container>
+
+      <TenantModal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        onSuccess={fetchData}
+      />
     </Fragment>
   );
 }

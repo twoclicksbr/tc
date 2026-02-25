@@ -24,3 +24,13 @@ export async function apiGet<T>(path: string): Promise<T> {
   }
   return res.json() as Promise<T>;
 }
+
+export async function apiPost<T>(path: string, body: unknown): Promise<T> {
+  const res = await apiFetch(path, { method: 'POST', body: JSON.stringify(body) });
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({}));
+    const err = Object.assign(new Error(`API error: ${res.status}`), { status: res.status, data: json });
+    throw err;
+  }
+  return res.json() as Promise<T>;
+}

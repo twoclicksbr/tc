@@ -11,6 +11,18 @@ class TenantRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        if ($this->isMethod('POST')) {
+            $base = str_replace('-', '_', $this->input('slug', ''));
+            $this->merge([
+                'db_name'     => $base,
+                'db_user'     => $base,
+                'db_password' => \Illuminate\Support\Str::random(32),
+            ]);
+        }
+    }
+
     public function rules(): array
     {
         $tenantId = $this->route('id');
