@@ -142,7 +142,7 @@ export function NavbarMenu() {
           <DropdownMenu open={dashboardOpen} onOpenChange={setDashboardOpen}>
             <DropdownMenuTrigger
               className={cn(
-                'flex items-center gap-1 px-0 py-3.5 text-sm text-secondary-foreground text-nowrap',
+                'flex items-center gap-1 px-0 py-3.5 text-sm font-medium text-secondary-foreground text-nowrap',
                 'rounded-none border-b-2 border-transparent bg-transparent!',
                 'hover:text-mono hover:bg-transparent',
                 'focus:text-mono focus:bg-transparent focus-visible:outline-none',
