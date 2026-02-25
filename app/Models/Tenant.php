@@ -22,6 +22,8 @@ class Tenant extends Model
         'active',
     ];
 
+    protected $hidden = ['db_password'];
+
     protected $casts = [
         'db_password'     => 'encrypted',
         'expiration_date' => 'date',
