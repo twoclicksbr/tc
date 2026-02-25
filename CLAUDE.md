@@ -93,6 +93,10 @@ Campos `after_*` são combobox com opções: `index`, `show`, `create`, `edit`.
 | Tabela | Descrição |
 |--------|-----------|
 | `personal_access_tokens` | Tokens Sanctum (gerada via migration Sanctum) |
+| `sessions` | Sessões de usuário (migration padrão Laravel) |
+| `password_reset_tokens` | Tokens de reset de senha (migration padrão Laravel) |
+| `cache` | Cache da aplicação (migration padrão Laravel) |
+| `jobs` / `job_batches` / `failed_jobs` | Filas (migration padrão Laravel) |
 
 ### Autenticação (Sanctum)
 
@@ -153,8 +157,9 @@ Sem mexer em rotas, sem criar controller de CRUD. Tudo dinâmico.
 - **URL local:** http://sc360.test:5173
 - **Auth:** Laravel Sanctum ✅ — adapter e provider implementados e em uso
 - **Status:** instalado, rodando em dev
-- **Layout em uso:** `Demo1Layout` (`frontend/src/layouts/demo1/`)
+- **Layout em uso:** `Demo3Layout` (`frontend/src/layouts/demo3/`)
 - **Provider de auth em uso:** `AuthProvider` de `frontend/src/auth/providers/laravel-provider.tsx` (importado em `App.tsx`)
+- **Providers em uso em `App.tsx`:** `AuthProvider`, `SettingsProvider`, `ThemeProvider`, `I18nProvider`, `TooltipsProvider`, `QueryProvider`, `ModulesProvider`
 
 ### Variáveis de Ambiente (`frontend/.env`)
 
