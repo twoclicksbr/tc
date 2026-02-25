@@ -278,7 +278,13 @@ export function TenantsPage() {
       try {
         await Promise.all(
           changedItems.map((item) =>
-            apiPut<unknown>(`/v1/admin/tenants/${item.id}`, { order: item.order }),
+            apiPut<unknown>(`/v1/admin/tenants/${item.id}`, {
+              name: item.name,
+              slug: item.slug,
+              expiration_date: item.expiration_date,
+              active: item.active,
+              order: item.order,
+            }),
           ),
         );
         fetchData();
