@@ -223,7 +223,7 @@ export function TenantModal({ open, onOpenChange, onSuccess, tenant }: TenantMod
           )}
         </DialogBody>
 
-        <DialogFooter className="flex-row justify-between">
+        <DialogFooter className="flex-row sm:justify-between items-center">
           <div className="flex items-center gap-2">
             <Switch
               id="tenant-active"
