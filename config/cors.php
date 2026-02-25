@@ -20,11 +20,12 @@ return [
     'allowed_methods' => ['*'],
 
     'allowed_origins' => [
-        'http://sc360.test:5173',
         'http://localhost:5173',
     ],
 
-    'allowed_origins_patterns' => [],
+    'allowed_origins_patterns' => [
+        '#^https?://.*\.sc360\.test(:\d+)?$#',
+    ],
 
     'allowed_headers' => ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With'],
 
