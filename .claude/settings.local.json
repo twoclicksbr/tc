@@ -54,7 +54,15 @@
       "Bash(xargs grep -l \"Customer Details\\\\|CustomerDetails\\\\|customer-details\")",
       "Bash(xargs grep -l \"Dialog\\\\|Sheet\\\\|Modal\")",
       "Bash(xargs grep -l \"customer\\\\|Client\\\\|client\")",
-      "Bash(grep -l \"Customer Details\" /c/Herd/themeforest/metronic/demo34/apps/customers/*.html)"
+      "Bash(grep -l \"Customer Details\" /c/Herd/themeforest/metronic/demo34/apps/customers/*.html)",
+      "Bash(PGPASSWORD=Millena2012@ psql -h 127.0.0.1 -U postgres -d sc360_main -c \":*)",
+      "Bash(PGPASSWORD=Millena2012@ \"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -h 127.0.0.1 -U postgres -d sc360_main -c \":*)",
+      "Bash(\"/c/Users/alexa/.config/herd/bin/php84/php.exe\" artisan migrate:fresh --database=main_sand --path=database/migrations/main --seed)",
+      "Bash(\"/c/Users/alexa/.config/herd/bin/php84/php.exe\" artisan migrate:fresh --database=main_prod --path=database/migrations/main --seed)",
+      "Bash(\"/c/Users/alexa/.config/herd/bin/php84/php.exe\" artisan migrate:fresh --database=main_prod --path=database/migrations/main)",
+      "Bash(\"/c/Users/alexa/.config/herd/bin/php84/php.exe\" artisan migrate --database=main_log --path=database/migrations/log)",
+      "Bash(\"/c/Users/alexa/.config/herd/bin/php84/php.exe\" artisan migrate:fresh --database=main_log --path=database/migrations/log)",
+      "Bash(PGPASSWORD=Millena2012@ \"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -h 127.0.0.1 -d tc_main -c \"CREATE SCHEMA IF NOT EXISTS sand; CREATE SCHEMA IF NOT EXISTS prod; CREATE SCHEMA IF NOT EXISTS log;\")"
     ]
   }
 }

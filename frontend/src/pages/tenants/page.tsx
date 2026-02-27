@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CalendarIcon } from 'lucide-react';
+import { Building2, CalendarIcon } from 'lucide-react';
 import { type DateRange } from 'react-day-picker';
 import { GenericGrid } from '@/components/generic-grid';
 import { TenantModal } from './tenant-modal';
@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
-// moduleId=1 — único módulo criado pelo MainSeeder em sc360_main (firstOrCreate, sempre ID=1 após migrate:fresh)
+// moduleId=1 — único módulo criado pelo MainSeeder em tc_main (firstOrCreate, sempre ID=1 após migrate:fresh)
 const MODULE_ID = 1;
 
 export function TenantsPage() {
@@ -120,6 +120,7 @@ export function TenantsPage() {
           },
         },
       ]}
+      icon={Building2}
       modalComponent={TenantModal}
       showActionShow={false}
       showActionRestore={false}

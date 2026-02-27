@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Camada_1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: #fff;
+      }
+    </style>
+  </defs>
+  <path class="cls-1" d="M15,6.75l.19,27.4c0,.4.33.73.73.73.15,0,.29-.05.42-.13l4.93-4.44c.33-.23.79-.15,1.02.18.03.04.05.08.07.13l3.44,7.93c.16.37.59.54.96.38,0,0,0,0,0,0l3.35-1.46c.37-.16.54-.59.38-.96,0,0,0,0,0,0l-3.44-7.93c-.16-.37.01-.8.38-.96.04-.02.09-.03.14-.04l7.49-.93c.4-.09.65-.47.56-.87-.03-.13-.09-.25-.18-.35L16.26,6.25c-.39-.36-1.06-.47-1.26.5"/>
+  <rect class="cls-1" x="1.14" y="16.68" width="9.36" height="2.88" rx="1.05" ry="1.05"/>
+  <rect class="cls-1" x="1.86" y="26.76" width="9.36" height="2.88" rx="1.05" ry="1.05" transform="translate(-14.16 7.97) rotate(-32.6)"/>
+  <rect class="cls-1" x="23.46" y="3.72" width="9.36" height="2.88" rx="1.05" ry="1.05" transform="translate(8.55 26.01) rotate(-57.19)"/>
+  <rect class="cls-1" x="29.94" y="11.64" width="9.36" height="2.88" rx="1.05" ry="1.05" transform="translate(-1.9 19.06) rotate(-30)"/>
+</svg>

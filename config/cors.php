@@ -24,7 +24,8 @@ return [
     ],
 
     'allowed_origins_patterns' => [
-        '#^https?://.*\.sc360\.test(:\d+)?$#',
+        '#^https?://.*\.tc\.test(:\d+)?$#',
+        '#^https?://.*\.sandbox\.tc\.test(:\d+)?$#',
     ],
 
     'allowed_headers' => ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With'],

@@ -26,6 +26,12 @@ interface TenantShowModalProps {
   onSuccess: () => void;
 }
 
+interface TenantCredentials {
+  sand_password: string;
+  prod_password: string;
+  log_password: string;
+}
+
 type SlugStatus = 'idle' | 'checking' | 'available' | 'unavailable';
 type FieldErrors = Record<string, string[]>;
 
@@ -104,9 +110,15 @@ export function TenantShowModal({ open, onOpenChange, record, onSuccess }: Tenan
   const [slugStatus, setSlugStatus]     = useState<SlugStatus>('idle');
   const [expirationDate, setExpirationDate] = useState('');
   const [active, setActive]                 = useState(true);
-  const [showPassword, setShowPassword] = useState(false);
   const [saving, setSaving]             = useState(false);
   const [errors, setErrors]             = useState<FieldErrors>({});
+
+  // Senhas carregadas sob demanda (endpoint /credentials)
+  const [credentials, setCredentials]   = useState<TenantCredentials | null>(null);
+  const [loadingCreds, setLoadingCreds] = useState(false);
+  const [showSandPass, setShowSandPass] = useState(false);
+  const [showProdPass, setShowProdPass] = useState(false);
+  const [showLogPass, setShowLogPass]   = useState(false);
 
   // Reset ao abrir o modal
   useEffect(() => {
@@ -118,8 +130,11 @@ export function TenantShowModal({ open, onOpenChange, record, onSuccess }: Tenan
       setActive(record.active ?? true);
       setErrors({});
       setSlugStatus('idle');
-      setShowPassword(false);
       setSaving(false);
+      setCredentials(null);
+      setShowSandPass(false);
+      setShowProdPass(false);
+      setShowLogPass(false);
     }
   }, [open, record]);
 
@@ -139,6 +154,31 @@ export function TenantShowModal({ open, onOpenChange, record, onSuccess }: Tenan
     }, 500);
     return () => clearTimeout(timer);
   }, [slug, record?.id]);
+
+  async function loadCredentials(): Promise<TenantCredentials | null> {
+    if (credentials) return credentials;
+    if (!record) return null;
+    setLoadingCreds(true);
+    try {
+      const data = await apiGet<TenantCredentials>(`/v1/admin/tenants/${record.id}/credentials`);
+      setCredentials(data);
+      return data;
+    } catch {
+      return null;
+    } finally {
+      setLoadingCreds(false);
+    }
+  }
+
+  async function handleTogglePassword(schema: 'sand' | 'prod' | 'log') {
+    const isShown = schema === 'sand' ? showSandPass : schema === 'prod' ? showProdPass : showLogPass;
+    if (!isShown && !credentials) {
+      await loadCredentials();
+    }
+    if (schema === 'sand') setShowSandPass((v) => !v);
+    if (schema === 'prod') setShowProdPass((v) => !v);
+    if (schema === 'log')  setShowLogPass((v) => !v);
+  }
 
   function handleNameChange(value: string) {
     setName(value);
@@ -169,7 +209,26 @@ export function TenantShowModal({ open, onOpenChange, record, onSuccess }: Tenan
     }
   }
 
+  function PasswordCell({ shown, password, onToggle }: { shown: boolean; password?: string; onToggle: () => void }) {
+    return (
+      <span className="text-sm font-normal text-foreground leading-6 font-mono flex items-center gap-2">
+        {shown ? (password ?? '—') : '••••••••••••'}
+        <button
+          type="button"
+          onClick={onToggle}
+          disabled={loadingCreds}
+          className="text-muted-foreground hover:text-foreground disabled:opacity-40"
+          tabIndex={-1}
+        >
+          {shown ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+        </button>
+      </span>
+    );
+  }
+
   if (!record) return null;
+
+  const dbLabel = `tc_${record.db_name}`;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -225,7 +284,7 @@ export function TenantShowModal({ open, onOpenChange, record, onSuccess }: Tenan
               </InfoField>
               <InfoField label="Usuário">
                 <Badge appearance="light">
-                  <span className="font-mono">{record.db_user || '—'}</span>
+                  <span className="font-mono">{record.sand_user || '—'}</span>
                 </Badge>
               </InfoField>
 
@@ -306,7 +365,7 @@ export function TenantShowModal({ open, onOpenChange, record, onSuccess }: Tenan
                     {/* Cards lado a lado — grid-cols-3 */}
                     <div className="grid grid-cols-3 gap-4">
 
-                      {/* Card 1 */}
+                      {/* Card Sandbox */}
                       <div className="border border-border bg-accent/70 rounded-md shadow-none flex flex-col">
                         <h3 className="text-sm font-medium text-foreground py-2.5 ps-2 flex items-center gap-2">
                           <DatabaseZap className="size-4" />
@@ -315,30 +374,24 @@ export function TenantShowModal({ open, onOpenChange, record, onSuccess }: Tenan
                         <div className="bg-background rounded-md m-1 mt-0 border border-input py-4 px-3.5 space-y-4">
                           <div className="flex items-center justify-between">
                             <span className="text-xs font-normal text-secondary-foreground/80 leading-6">Banco</span>
-                            <span className="text-sm font-normal text-foreground leading-6 font-mono text-right">{record.db_name || '—'}</span>
+                            <span className="text-sm font-normal text-foreground leading-6 font-mono text-right">{dbLabel}</span>
                           </div>
                           <div className="flex items-center justify-between">
                             <span className="text-xs font-normal text-secondary-foreground/80 leading-6">Usuário</span>
-                            <span className="text-sm font-normal text-foreground leading-6 font-mono text-right">{record.db_user || '—'}</span>
+                            <span className="text-sm font-normal text-foreground leading-6 font-mono text-right">{record.sand_user || '—'}</span>
                           </div>
                           <div className="flex items-center justify-between">
                             <span className="text-xs font-normal text-secondary-foreground/80 leading-6">Senha</span>
-                            <span className="text-sm font-normal text-foreground leading-6 font-mono flex items-center gap-2">
-                              {showPassword ? (record.db_password ?? '—') : '••••••••••••'}
-                              <button
-                                type="button"
-                                onClick={() => setShowPassword((v) => !v)}
-                                className="text-muted-foreground hover:text-foreground"
-                                tabIndex={-1}
-                              >
-                                {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                              </button>
-                            </span>
+                            <PasswordCell
+                              shown={showSandPass}
+                              password={credentials?.sand_password}
+                              onToggle={() => handleTogglePassword('sand')}
+                            />
                           </div>
                         </div>
                       </div>
 
-                      {/* Card 2 */}
+                      {/* Card Produção */}
                       <div className="border border-border bg-accent/70 rounded-md shadow-none flex flex-col">
                         <h3 className="text-sm font-medium text-foreground py-2.5 ps-2 flex items-center gap-2">
                           <Server className="size-4" />
@@ -347,30 +400,24 @@ export function TenantShowModal({ open, onOpenChange, record, onSuccess }: Tenan
                         <div className="bg-background rounded-md m-1 mt-0 border border-input py-4 px-3.5 space-y-4">
                           <div className="flex items-center justify-between">
                             <span className="text-xs font-normal text-secondary-foreground/80 leading-6">Banco</span>
-                            <span className="text-sm font-normal text-foreground leading-6 font-mono text-right">{record.db_name || '—'}</span>
+                            <span className="text-sm font-normal text-foreground leading-6 font-mono text-right">{dbLabel}</span>
                           </div>
                           <div className="flex items-center justify-between">
                             <span className="text-xs font-normal text-secondary-foreground/80 leading-6">Usuário</span>
-                            <span className="text-sm font-normal text-foreground leading-6 font-mono text-right">{record.db_user || '—'}</span>
+                            <span className="text-sm font-normal text-foreground leading-6 font-mono text-right">{record.prod_user || '—'}</span>
                           </div>
                           <div className="flex items-center justify-between">
                             <span className="text-xs font-normal text-secondary-foreground/80 leading-6">Senha</span>
-                            <span className="text-sm font-normal text-foreground leading-6 font-mono flex items-center gap-2">
-                              {showPassword ? (record.db_password ?? '—') : '••••••••••••'}
-                              <button
-                                type="button"
-                                onClick={() => setShowPassword((v) => !v)}
-                                className="text-muted-foreground hover:text-foreground"
-                                tabIndex={-1}
-                              >
-                                {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                              </button>
-                            </span>
+                            <PasswordCell
+                              shown={showProdPass}
+                              password={credentials?.prod_password}
+                              onToggle={() => handleTogglePassword('prod')}
+                            />
                           </div>
                         </div>
                       </div>
 
-                      {/* Card 3 */}
+                      {/* Card Log */}
                       <div className="border border-border bg-accent/70 rounded-md shadow-none flex flex-col">
                         <h3 className="text-sm font-medium text-foreground py-2.5 ps-2 flex items-center gap-2">
                           <ScrollText className="size-4" />
@@ -379,25 +426,19 @@ export function TenantShowModal({ open, onOpenChange, record, onSuccess }: Tenan
                         <div className="bg-background rounded-md m-1 mt-0 border border-input py-4 px-3.5 space-y-4">
                           <div className="flex items-center justify-between">
                             <span className="text-xs font-normal text-secondary-foreground/80 leading-6">Banco</span>
-                            <span className="text-sm font-normal text-foreground leading-6 font-mono text-right">{record.db_name || '—'}</span>
+                            <span className="text-sm font-normal text-foreground leading-6 font-mono text-right">{dbLabel}</span>
                           </div>
                           <div className="flex items-center justify-between">
                             <span className="text-xs font-normal text-secondary-foreground/80 leading-6">Usuário</span>
-                            <span className="text-sm font-normal text-foreground leading-6 font-mono text-right">{record.db_user || '—'}</span>
+                            <span className="text-sm font-normal text-foreground leading-6 font-mono text-right">{record.log_user || '—'}</span>
                           </div>
                           <div className="flex items-center justify-between">
                             <span className="text-xs font-normal text-secondary-foreground/80 leading-6">Senha</span>
-                            <span className="text-sm font-normal text-foreground leading-6 font-mono flex items-center gap-2">
-                              {showPassword ? (record.db_password ?? '—') : '••••••••••••'}
-                              <button
-                                type="button"
-                                onClick={() => setShowPassword((v) => !v)}
-                                className="text-muted-foreground hover:text-foreground"
-                                tabIndex={-1}
-                              >
-                                {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                              </button>
-                            </span>
+                            <PasswordCell
+                              shown={showLogPass}
+                              password={credentials?.log_password}
+                              onToggle={() => handleTogglePassword('log')}
+                            />
                           </div>
                         </div>
                       </div>

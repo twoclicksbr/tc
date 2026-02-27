@@ -66,11 +66,11 @@ export function HeaderLogo() {
       {/* Menu Section */}
       <div className="flex items-center gap-3">
         <h3 className="text-accent-foreground text-base hidden md:block">
-          SmartClick360°
+          TwoClicks
         </h3>
 
-        {/* Account dropdown — hidden temporarily */}
-        <div className="hidden">
+        {/* Account dropdown */}
+        <div className="hidden md:flex items-center gap-1.5">
           <span className="text-sm text-muted-foreground font-medium">
             /
           </span>

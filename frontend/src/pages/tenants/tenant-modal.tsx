@@ -10,8 +10,9 @@ export interface TenantForEdit {
   name: string;
   slug: string;
   db_name: string;
-  db_user: string;
-  db_password?: string;
+  sand_user?: string;
+  prod_user?: string;
+  log_user?: string;
   expiration_date: string | null;
   active: boolean;
   created_at: string;

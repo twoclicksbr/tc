@@ -12,12 +12,21 @@ class ResolveTenant
 {
     public function handle(Request $request, Closure $next): Response
     {
-        $slug = $request->route('tenant');
+        $slug      = $request->route('tenant');
+        $isSandbox = str_contains($request->getHost(), '.sandbox.');
+        $schema    = $isSandbox ? 'sand' : 'prod';
 
         if ($slug === 'admin') {
+            // Reconfigura main para o schema correto (sand,log ou prod,log)
+            config(['database.connections.main.search_path' => $schema . ',log']);
+            DB::purge('main');
             DB::setDefaultConnection('main');
             return $next($request);
         }
+
+        // Aponta main para o schema correto antes do lookup do tenant
+        config(['database.connections.main.search_path' => $schema . ',log']);
+        DB::purge('main');
 
         $tenant = Tenant::where('slug', $slug)->first();
 
@@ -25,13 +34,19 @@ class ResolveTenant
             return response()->json(['message' => 'Tenant não encontrado.'], 404);
         }
 
-        // Em produção: usar $tenant->db_user e $tenant->db_password (decrypt automático via cast 'encrypted')
-        // Em dev: usa as credenciais do .env para simplificar (não requer criar usuário por tenant no PostgreSQL)
-        config([
-            'database.connections.tenant.database' => 'sc360_' . $tenant->db_name,
-            'database.connections.tenant.username'  => env('DB_USERNAME'),
-            'database.connections.tenant.password'  => env('DB_PASSWORD'),
-        ]);
+        $dbName   = 'tc_' . $tenant->db_name;
+        $username = $schema === 'sand' ? $tenant->sand_user : $tenant->prod_user;
+        $password = $schema === 'sand' ? $tenant->sand_password : $tenant->prod_password;
+
+        config(['database.connections.tenant' => array_merge(
+            config('database.connections.main'),
+            [
+                'database'    => $dbName,
+                'username'    => $username,
+                'password'    => $password,
+                'search_path' => $schema . ',log',
+            ]
+        )]);
 
         DB::purge('tenant');
         DB::setDefaultConnection('tenant');

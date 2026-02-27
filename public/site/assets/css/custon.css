@@ -1,0 +1,54 @@
+.gradiente-menu {
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0.0));
+}
+
+.custom-footer {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    padding: 1rem;
+    color: white;
+    text-align: center;
+    z-index: 10;
+    background: rgba(0, 0, 0, 0.5);
+    /* escurecido */
+}
+
+.custom-close {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    z-index: 9999;
+    color: #000;
+    /* preto */
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.custom-close:hover {
+    color: red;
+    /* fica vermelho no hover */
+}
+
+.heading-as-btn {
+    display: inline-block;
+    background: #000;
+    color: #fff;
+    padding: 8px 16px;
+    font-size: 18px;
+    font-weight: 600;
+    text-transform: uppercase;
+    text-align: center;
+}
+
+.heading-as-btn-transp {
+    display: inline-block;
+    background: #000000ac;
+    color: #fff;
+    padding: 8px 16px;
+    font-size: 18px;
+    font-weight: 600;
+    text-transform: uppercase;
+    text-align: left;
+}

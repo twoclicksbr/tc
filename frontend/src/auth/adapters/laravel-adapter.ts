@@ -1,7 +1,12 @@
 import { AuthModel, UserModel } from '@/auth/lib/models';
-import { getTenantSlug } from '@/lib/tenant';
+import { getTenantSlug, isSandbox } from '@/lib/tenant';
 
-const API_URL = import.meta.env.VITE_API_URL as string;
+function getApiUrl(): string {
+  const base = import.meta.env.VITE_API_URL as string;
+  return isSandbox()
+    ? base.replace('://api.', '://api.sandbox.')
+    : base;
+}
 
 interface LaravelUser {
   id: number;
@@ -29,7 +34,7 @@ async function apiFetch(
   path: string,
   options: RequestInit = {},
 ): Promise<Response> {
-  return fetch(`${API_URL}${path}`, {
+  return fetch(`${getApiUrl()}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',

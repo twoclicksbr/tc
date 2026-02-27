@@ -15,17 +15,23 @@ class Tenant extends Model
         'name',
         'slug',
         'db_name',
-        'db_user',
-        'db_password',
+        'sand_user',
+        'sand_password',
+        'prod_user',
+        'prod_password',
+        'log_user',
+        'log_password',
         'expiration_date',
         'order',
         'active',
     ];
 
-    protected $hidden = ['db_password'];
+    protected $hidden = ['sand_password', 'prod_password', 'log_password'];
 
     protected $casts = [
-        'db_password'     => 'encrypted',
+        'sand_password'   => 'encrypted',
+        'prod_password'   => 'encrypted',
+        'log_password'    => 'encrypted',
         'expiration_date' => 'date:Y-m-d',
         'active'          => 'boolean',
     ];

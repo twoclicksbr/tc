@@ -18,11 +18,26 @@ class TenantObserver
         }
 
         // Sempre deriva do slug para garantir consistência
-        $tenant->db_name = str_replace('-', '_', $tenant->slug);
-        $tenant->db_user = $tenant->db_name;
+        $base = str_replace('-', '_', $tenant->slug);
+        $tenant->db_name = $base;
 
-        if (empty($tenant->db_password)) {
-            $tenant->db_password = Str::random(24);
+        if (empty($tenant->sand_user)) {
+            $tenant->sand_user = 'sand_' . $base;
+        }
+        if (empty($tenant->sand_password)) {
+            $tenant->sand_password = Str::random(24);
+        }
+        if (empty($tenant->prod_user)) {
+            $tenant->prod_user = 'prod_' . $base;
+        }
+        if (empty($tenant->prod_password)) {
+            $tenant->prod_password = Str::random(24);
+        }
+        if (empty($tenant->log_user)) {
+            $tenant->log_user = 'log_' . $base;
+        }
+        if (empty($tenant->log_password)) {
+            $tenant->log_password = Str::random(24);
         }
 
         if (empty($tenant->expiration_date)) {

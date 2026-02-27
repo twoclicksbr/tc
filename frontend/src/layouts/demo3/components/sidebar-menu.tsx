@@ -3,6 +3,7 @@ import {
   ArrowUpCircle,
   BarChart3,
   Building2,
+  Layers,
   Package,
   Settings,
   ShoppingCart,
@@ -32,7 +33,8 @@ export function SidebarMenu() {
   const isAdmin = getTenantSlug() === 'admin';
 
   const items: Item[] = [
-    ...(isAdmin ? [{ icon: Building2, path: '/tenants', title: 'Tenants' }] : []),
+    ...(isAdmin ? [{ icon: Layers,    path: '/platforms', title: 'Plataformas' }] : []),
+    ...(isAdmin ? [{ icon: Building2, path: '/tenants',   title: 'Tenants' }] : []),
     { icon: Users,            path: '/pessoas',      title: 'Pessoas' },
     { icon: Package,          path: '/produtos',     title: 'Produtos' },
     { icon: ShoppingCart,     path: '/compras',      title: 'Compras' },

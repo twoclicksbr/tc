@@ -6,17 +6,19 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    protected $connection = 'main';
-
     public function up(): void
     {
-        Schema::connection('main')->create('tenants', function (Blueprint $table) {
+        Schema::create('tenants', function (Blueprint $table) {
             $table->id();
             $table->string('name');
             $table->string('slug')->unique();
             $table->string('db_name');
-            $table->string('db_user');
-            $table->text('db_password');
+            $table->string('sand_user')->nullable();
+            $table->text('sand_password')->nullable();
+            $table->string('prod_user')->nullable();
+            $table->text('prod_password')->nullable();
+            $table->string('log_user')->nullable();
+            $table->text('log_password')->nullable();
             $table->date('expiration_date');
             $table->integer('order')->default(1);
             $table->boolean('active')->default(true);
@@ -27,6 +29,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::connection('main')->dropIfExists('tenants');
+        Schema::dropIfExists('tenants');
     }
 };

@@ -34,5 +34,18 @@ class MainSeeder extends Seeder
                 'active'     => true,
             ]
         );
+
+        Module::on('main')->firstOrCreate(
+            ['name_url' => 'platforms'],
+            [
+                'name'       => 'Plataformas',
+                'type'       => 'modulo',
+                'name_table' => 'platforms',
+                'model'      => 'Platform',
+                'request'    => 'PlatformRequest',
+                'order'      => 3,
+                'active'     => true,
+            ]
+        );
     }
 }

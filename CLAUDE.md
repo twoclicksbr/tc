@@ -1,4 +1,4 @@
-# CLAUDE.md — sc360-valsul (Auto Peças)
+# CLAUDE.md — tc (Auto Peças)
 
 > MVP em andamento. Novas features e módulos serão adicionados conforme a evolução do projeto.
 
@@ -43,30 +43,37 @@ Arquivo: `.claude/commands/vite-close.md`
 
 ## Repositório
 
-- **GitHub:** https://github.com/twoclicksbr/sc360-valsul.git
-- **CLAUDE.md (raw):** https://raw.githubusercontent.com/twoclicksbr/sc360-valsul/refs/heads/main/CLAUDE.md
+- **GitHub:** https://github.com/twoclicksbr/tc.git
+- **CLAUDE.md (raw):** https://raw.githubusercontent.com/twoclicksbr/tc/refs/heads/main/CLAUDE.md
 
 ---
 
 ## Sobre o Projeto
 
-Plataforma SaaS multi-tenant de gerenciamento para auto peças, desenvolvida em **Laravel + JavaScript**. Cada cliente (tenant) possui banco de dados isolado. Um banco central (`sc360_main`) gerencia os tenants. O objetivo é ter um sistema funcional em 20 dias, começando pelo cadastro de pessoas, autenticação e submódulos reutilizáveis.
+Plataforma SaaS multi-tenant de gerenciamento para auto peças, desenvolvida em **Laravel + JavaScript**. Cada cliente (tenant) possui banco de dados isolado. Um banco central (`tc_main`) gerencia os tenants. O objetivo é ter um sistema funcional em 20 dias, começando pelo cadastro de pessoas, autenticação e submódulos reutilizáveis.
 
 ---
 
 ## Arquitetura Multi-Tenancy
 
 ### Conceito
-- SmartClick360° é uma plataforma SaaS que atende múltiplos clientes (tenants)
+- TwoClicks é uma plataforma SaaS que atende múltiplos clientes (tenants)
 - Cada tenant tem seu próprio banco de dados isolado
-- Um banco central (`sc360_main`) gerencia os tenants
+- Um banco central (`tc_main`) gerencia os tenants
 
-### Bancos de Dados
+### Bancos de Dados e Schemas
 
-| Banco | Conteúdo |
-|-------|----------|
-| `sc360_main` | tenants, landlord users, planos |
-| `sc360_{db_name}` | people, users, modules, etc. (por tenant) |
+| Banco | Schemas | Conteúdo |
+|-------|---------|----------|
+| `tc_main` | `prod`, `sand`, `log` | tenants, platforms, landlord users, planos |
+| `tc_{db_name}` | `prod`, `sand`, `log` | people, users, modules, etc. (por tenant) |
+
+Cada banco possui 3 schemas PostgreSQL:
+- **`prod`** — dados de produção
+- **`sand`** — sandbox (ambiente de testes isolado)
+- **`log`** — audit logs (tabela `audit_logs`)
+
+O `search_path` ativo é determinado pelo subdomínio da requisição: `.sandbox.` no hostname → `sand`, caso contrário → `prod`. O schema `log` é sempre incluído como segundo path.
 
 ### URLs
 
@@ -74,41 +81,42 @@ Plataforma SaaS multi-tenant de gerenciamento para auto peças, desenvolvida em 
 
 | URL | Acesso |
 |-----|--------|
-| `admin.smartclick360.com` | Landlord (admin SC360°) |
-| `{slug}.smartclick360.com` | Tenant (cliente) |
+| `admin.twoclicks.com.br` | Landlord (admin TwoClicks) |
+| `{slug}.twoclicks.com.br` | Tenant (cliente) |
 
 **API (centralizada):**
 
 | Rota | Banco |
 |------|-------|
-| `api.smartclick360.com/v1/admin/auth/login` | sc360_main |
-| `api.smartclick360.com/v1/admin/{module}` | sc360_main |
-| `api.smartclick360.com/v1/{tenant}/auth/login` | sc360_{db_name} |
-| `api.smartclick360.com/v1/{tenant}/{module}` | sc360_{db_name} |
+| `api.twoclicks.com.br/v1/admin/auth/login` | tc_main |
+| `api.twoclicks.com.br/v1/admin/{module}` | tc_main |
+| `api.twoclicks.com.br/v1/{tenant}/auth/login` | tc_{db_name} |
+| `api.twoclicks.com.br/v1/{tenant}/{module}` | tc_{db_name} |
 
 **Local (dev):**
 
 | URL | Acesso |
 |-----|--------|
-| `admin.sc360.test` | Landlord |
-| `valsul.sc360.test` | Tenant |
-| `api.sc360.test/v1/{tenant}/{module}` | API |
+| `admin.tc.test` | Landlord |
+| `valsul.tc.test` | Tenant |
+| `api.tc.test/v1/{tenant}/{module}` | API |
 
 ### Fluxo de Criação de Tenant
 
 1. Landlord cadastra cliente no admin (nome + validade)
 2. `TenantObserver::creating` gera automaticamente:
    - `slug` a partir do `name` (Str::slug)
-   - `db_name` e `db_user` do slug (troca hífen por underscore)
-   - `db_password` aleatório (Str::random(24))
+   - `db_name` = slug com hífens trocados por underscore
+   - `sand_user` = `sand_{base}`, `prod_user` = `prod_{base}`, `log_user` = `log_{base}`
+   - `sand_password`, `prod_password`, `log_password` aleatórios (Str::random(24))
    - `expiration_date` = hoje + 30 dias (se não informada)
 3. `TenantObserver::created` chama `TenantDatabaseService::provision()`:
-   - Cria banco `sc360_{db_name}` no PostgreSQL (via conexão main como superuser)
-   - Cria user `{db_user}` com senha e concede privilégios
-   - Transfere ownership do schema public para o tenant user
-   - Roda migrations em `database/migrations/tenant/` no novo banco
-   - Executa `AdminSeeder` no novo banco (person Admin + user admin@admin.com)
-   - Em caso de erro: rollback completo (remove tenant do main, dropa banco e user)
+   - Cria banco `tc_{db_name}` no PostgreSQL (via conexão main como superuser)
+   - Cria 3 users PostgreSQL: `sand_{base}`, `prod_{base}`, `log_{base}`
+   - Dropa schema `public`; cria schemas `sand`, `prod`, `log` com ownership nos respectivos users
+   - Roda migrations `database/migrations/tenant/` nos schemas `sand` e `prod`
+   - Roda migrations `database/migrations/log/` no schema `log`
+   - Em caso de erro: rollback completo (remove tenant do main, dropa banco e os 3 users)
 
 ### Validade
 
@@ -146,7 +154,7 @@ Exemplos:
 
 ### Documentação da API
 
-- **URL local:** https://sc360.test/docs
+- **URL local:** https://tc.test/docs
 - **Regenerar:** `"/c/Users/alexa/.config/herd/bin/php84/php.exe" artisan scribe:generate`
 
 ### Padrão de Tabelas
@@ -159,17 +167,18 @@ id → campos específicos → order (default 1) → active (default true) → t
 
 ### Estrutura de Tabelas
 
-#### Banco sc360_main
+#### Banco tc_main
 
 | Tabela | Campos |
 |--------|--------|
-| `tenants` | name, slug (unique), db_name, db_user, db_password (encrypted), expiration_date, order, active |
+| `tenants` | name, slug (unique), db_name, sand_user, sand_password (encrypted), prod_user, prod_password (encrypted), log_user, log_password (encrypted), expiration_date, order, active |
+| `platforms` | name, slug (unique), db_name, sand_user, sand_password (encrypted), prod_user, prod_password (encrypted), log_user, log_password (encrypted), expiration_date, order, active |
 | `people` | name, birth_date, order, active |
 | `users` | person_id (FK people), email, password, active |
 | `modules` | (mesmos campos que tenant — ver seção Configuração) |
 | `personal_access_tokens` | tokenable_type, tokenable_id, name, token, abilities, last_used_at, expires_at |
 
-> **Nota:** `sc360_main` tem as mesmas tabelas operacionais que os bancos tenant (`people`, `users`, `modules`, `personal_access_tokens`) para suportar a autenticação e CRUD do landlord admin via `/v1/admin/`.
+> **Nota:** `tc_main` tem as mesmas tabelas operacionais que os bancos tenant (`people`, `users`, `modules`, `personal_access_tokens`) para suportar a autenticação e CRUD do landlord admin via `/v1/admin/`.
 
 #### Principais (por tenant)
 
@@ -220,7 +229,7 @@ Campos `after_*` são combobox com opções: `index`, `show`, `create`, `edit`.
 
 Controller: `AuthController` — rotas públicas e protegidas por `auth:sanctum`.
 
-O `{tenant}` pode ser qualquer slug de tenant (ex: `valsul`) ou `admin` (acessa `sc360_main`).
+O `{tenant}` pode ser qualquer slug de tenant (ex: `valsul`) ou `admin` (acessa `tc_main`).
 
 | Método | URL | Descrição | Auth |
 |--------|-----|-----------|------|
@@ -254,7 +263,7 @@ Todas protegidas por `auth:sanctum`. `{module}` = `name_url` do registro na tabe
 | `paths` | `['api/*', 'v1/*', 'sanctum/csrf-cookie']` |
 | `allowed_methods` | `['*']` |
 | `allowed_origins` | `['http://localhost:5173']` |
-| `allowed_origins_patterns` | `['#^https?://.*\.sc360\.test(:\d+)?$#']` (todos os subdomínios) |
+| `allowed_origins_patterns` | `['#^https?://.*\.tc\.test(:\d+)?$#']` (todos os subdomínios) |
 | `allowed_headers` | `['Content-Type', 'Authorization', 'Accept', 'X-Requested-With']` |
 | `supports_credentials` | `true` |
 
@@ -262,7 +271,8 @@ Todas protegidas por `auth:sanctum`. `{module}` = `name_url` do registro na tabe
 
 | Request | Módulo |
 |---------|--------|
-| `TenantRequest` | Validação de tenants |
+| `TenantRequest` | Validação de tenants — gera `sand_user/password`, `prod_user/password`, `log_user/password` em `prepareForValidation` |
+| `PlatformRequest` | Validação de platforms — mesma lógica do TenantRequest |
 | `PersonRequest` | Validação de pessoas |
 | `UserRequest` | Validação de usuários |
 | `ModuleRequest` | Validação de módulos |
@@ -281,7 +291,11 @@ Uma única `ModuleController` resolve o CRUD de qualquer módulo. Ela busca as c
 
 Padrão de URL: `api.{domínio}/v1/{tenant}/{module}` e `api.{domínio}/v1/{tenant}/{module}/{id}`
 
-As rotas da API estão restritas ao subdomínio `api` via `env('API_DOMAIN')` (ex: `api.sc360.test`). O prefixo de path é `/v1/{tenant}` — sem prefixo `/api`, apenas no subdomínio.
+O prefixo de path é `/v1/{tenant}` — sem prefixo `/api`. As rotas não estão mais restritas por domínio via `env('API_DOMAIN')`.
+
+**Rotas específicas (antes dos genéricos para evitar conflito):**
+- `GET /v1/{tenant}/tenants/{id}/credentials` → `TenantController::credentials` — retorna `sand_password`, `prod_password`, `log_password` descriptografados
+- `GET /v1/{tenant}/platforms/{id}/credentials` → `PlatformController::credentials` — mesma resposta para platforms
 
 #### Configuração de Módulo
 
@@ -295,9 +309,11 @@ Sem mexer em rotas, sem criar controller de CRUD. Tudo dinâmico.
 
 ### Middleware Multi-Tenancy (`app/Http/Middleware/ResolveTenant.php`)
 
-Resolve a conexão do banco com base no `{tenant}` da URL:
-- `{tenant} = 'admin'` → `DB::setDefaultConnection('main')` (banco `sc360_main`)
-- `{tenant} = qualquer slug` → configura conexão 'tenant' para `sc360_{db_name}` e define como default
+Resolve a conexão do banco com base no `{tenant}` da URL e no subdomínio da requisição:
+- Detecta ambiente via hostname: `.sandbox.` presente → `schema='sand'`, caso contrário → `schema='prod'`
+- `search_path` = `'{schema},log'` (ex: `'prod,log'` ou `'sand,log'`)
+- `{tenant} = 'admin'` → reconfigura `main` com o `search_path` correto (`DB::purge('main')`) e define como default
+- `{tenant} = qualquer slug` → configura conexão `tenant` com `database=tc_{db_name}`, credenciais do schema correto (`sand_user/sand_password` ou `prod_user/prod_password`) e `search_path` correto
 
 **Prioridade de Middleware** (`bootstrap/app.php`):
 ```php
@@ -320,7 +336,8 @@ Garante retorno 401 JSON para requisições não autenticadas. Sem isso, o Larav
 
 | Model | Conexão | Observação |
 |-------|---------|-----------|
-| `Tenant` | `main` (explícita) | Sempre usa sc360_main; `$hidden = ['db_password']`; cast `expiration_date` como `'date:Y-m-d'` |
+| `Tenant` | `main` (explícita) | Sempre usa tc_main; `$hidden = ['sand_password', 'prod_password', 'log_password']`; casts encrypted nos 3 passwords; cast `expiration_date` como `'date:Y-m-d'` |
+| `Platform` | `main` (explícita) | Mesma estrutura do Tenant; `$hidden = ['sand_password', 'prod_password', 'log_password']`; casts encrypted nos 3 passwords |
 | `User` | default (dinâmica) | Usa a conexão setada pelo middleware |
 | `Person` | default (dinâmica) | Usa a conexão setada pelo middleware; cast `birth_date` como `'date:Y-m-d'` |
 | `Module` | default (dinâmica) | Usa a conexão setada pelo middleware |
@@ -340,8 +357,9 @@ Garante retorno 401 JSON para requisições não autenticadas. Sem isso, o Larav
 | `2025_02_24_000006` | users (com person_id FK) |
 | `2025_02_24_000007` | personal_access_tokens |
 | `2025_02_24_000008` | modules |
+| `2026_02_27_000009` | platforms |
 
-**`database/migrations/tenant/`** — roda com `--database=tenant --path=database/migrations/tenant`
+**`database/migrations/tenant/`** — roda com `--database=tenant_sand` / `--database=tenant_prod`
 
 | Migration | Cria |
 |-----------|------|
@@ -350,27 +368,36 @@ Garante retorno 401 JSON para requisições não autenticadas. Sem isso, o Larav
 | `2025_02_24_000003` | users (com person_id FK) |
 | `2026_02_24_213424` | personal_access_tokens |
 
+**`database/migrations/log/`** — roda com `--database=tenant_log`
+
+| Migration | Cria |
+|-----------|------|
+| `2026_02_26_000001` | audit_logs (user_id, action, schema, status_code, table_name, record_id, old_values, new_values, ip_address, user_agent, created_at) |
+
 ### Observers (`app/Observers/`)
 
 | Observer | Gatilho | O que faz |
 |----------|---------|-----------|
-| `TenantObserver` | `creating` | Gera `slug`, `db_name`, `db_user`, `db_password`, `expiration_date` automaticamente |
+| `TenantObserver` | `creating` | Gera `slug`, `db_name`, `sand_user/password`, `prod_user/password`, `log_user/password`, `expiration_date` |
 | `TenantObserver` | `created` | Chama `TenantDatabaseService::provision()` — provisiona banco do novo tenant |
+| `PlatformObserver` | `creating` | Mesma geração automática de campos que `TenantObserver` |
+| `PlatformObserver` | `created` | Chama `PlatformDatabaseService::provision()` — provisiona banco da nova platform |
 
-Registrado em `AppServiceProvider::boot()` via `Tenant::observe(TenantObserver::class)`.
+Registrados em `AppServiceProvider::boot()`.
 
 ### Services (`app/Services/`)
 
 | Service | O que faz |
 |---------|-----------|
-| `TenantDatabaseService` | `provision(Tenant)`: cria banco PostgreSQL, user, grants, roda migrations tenant, roda AdminSeeder. Rollback completo em caso de erro. |
+| `TenantDatabaseService` | `provision(Tenant)`: cria banco, 3 users (`sand_`, `prod_`, `log_`), dropa schema `public`, cria schemas `sand`/`prod`/`log`, configura ownership e privileges, roda migrations tenant (sand+prod) e log. Rollback completo. |
+| `PlatformDatabaseService` | Mesma lógica que `TenantDatabaseService`, mas para o model `Platform`. |
 
 ### Seeders (`database/seeders/`)
 
 | Seeder | O que faz |
 |--------|-----------|
 | `DatabaseSeeder` | Chama MainSeeder + AdminSeeder |
-| `MainSeeder` | Cria módulo 'tenants' (id=1) e módulo 'modules' (id=2) em sc360_main via `Module::on('main')->firstOrCreate`. **Não cria tenant** — provisionamento é feito pelo `TenantObserver` ao salvar. |
+| `MainSeeder` | Cria módulo 'tenants' (id=1), 'modules' (id=2) e 'platforms' (id=3) em tc_main via `Module::on('main')->firstOrCreate`. **Não cria tenant/platform** — provisionamento é feito pelos Observers ao salvar. |
 | `AdminSeeder` | Cria person 'Admin' + user admin@admin.com na conexão default atual (main ou tenant) |
 
 **Comandos para rodar:**
@@ -386,7 +413,7 @@ php artisan migrate:fresh --database=tenant --path=database/migrations/tenant --
 - **Pasta:** `frontend/`
 - **Versão:** Metronic v9.4.5 — React 19 + Vite 7 + TypeScript + Tailwind CSS 4
 - **Layout de referência:** `C:\Herd\themeforest\metronic\crm`
-- **URL local:** http://sc360.test:5173
+- **URL local:** http://tc.test:5173
 - **Auth:** Laravel Sanctum ✅ — adapter e provider implementados e em uso
 - **Status:** instalado, rodando em dev
 - **Layout em uso:** `Demo3Layout` (`frontend/src/layouts/demo3/`)
@@ -400,7 +427,7 @@ VITE_APP_NAME=metronic-tailwind-react
 VITE_APP_VERSION=9.2.6
 
 ## Laravel API
-VITE_API_URL=https://api.sc360.test
+VITE_API_URL=https://api.tc.test
 VITE_TENANT_SLUG=demo
 
 ## Supabase Configuration (placeholder — não utilizado)
@@ -463,6 +490,7 @@ O arquivo contém as rotas do Metronic boilerplate (account, network, store, pub
 |------|-----------|-----------|
 | `/` | `Navigate to="/dashboard"` | Redireciona para dashboard |
 | `/dashboard` | `DashboardPage` | Dashboard geral (placeholder) |
+| `/platforms` | `PlatformsPage` | Grid de platforms — CRUD completo via modal ✅ — **só acessível no tenant `admin`**; outros são redirecionados para `/dashboard` |
 | `/tenants` | `TenantsPage` | Grid de tenants — CRUD completo via modal ✅ + modal de pesquisa com filtro de módulo (Validade) ✅ + modal CRM de detalhes (`TenantShowModal`) ✅ — **só acessível no tenant `admin`**; outros são redirecionados para `/dashboard` |
 | `/pessoas` | `PessoasPage` | Cadastro de pessoas (placeholder) |
 | `/produtos` | `ProdutosPage` | Produtos (placeholder) |
@@ -479,13 +507,14 @@ O menu horizontal do Demo3 tem um item fixo "Dashboard" como primeiro item (hard
 
 **Dropdown Dashboard:**
 - Geral → `/dashboard`
+- Plataformas → `/platforms` — **visível apenas quando `getTenantSlug() === 'admin'`**
 - Tenants → `/tenants` — **visível apenas quando `getTenantSlug() === 'admin'`**
 - Pessoas → `/pessoas`
 - Produtos → `/produtos`
 - Comercial → `/comercial`
 - Financeiro → `/financeiro`
 
-**Sidebar:** item "Tenants" também visível apenas quando `getTenantSlug() === 'admin'`.
+**Sidebar:** itens "Plataformas" (ícone `Layers`) e "Tenants" (ícone `Building2`) visíveis apenas quando `getTenantSlug() === 'admin'`.
 
 ### API Client (`frontend/src/lib/api.ts`)
 
@@ -504,17 +533,17 @@ Wrapper centralizado para chamadas à API Laravel. Injeta `Authorization: Bearer
 ```ts
 getTenantSlug(): string
 ```
-- Detecta o tenant pelo subdomínio: `demo.sc360.test` → `'demo'`
+- Detecta o tenant pelo subdomínio: `demo.tc.test` → `'demo'`
 - Fallback para `VITE_TENANT_SLUG` quando hostname tem menos de 3 partes (ex: `localhost`); se `VITE_TENANT_SLUG` não estiver definido, loga erro e retorna `''`
 - Usado em `laravel-adapter.ts` para montar as URLs da API dinamicamente
 
 ### Vite Config (`frontend/vite.config.ts`)
 
 ```ts
-server: { host: '0.0.0.0', port: 5173, https: false, allowedHosts: ['.sc360.test'] }
+server: { host: '0.0.0.0', port: 5173, https: false, allowedHosts: ['.tc.test'] }
 ```
 - `host: '0.0.0.0'` — responde em qualquer subdomínio em dev
-- `allowedHosts: ['.sc360.test']` — permite todos os subdomínios `*.sc360.test`
+- `allowedHosts: ['.tc.test']` — permite todos os subdomínios `*.tc.test`
 
 ---
 
@@ -696,6 +725,7 @@ Modal full-width (`max-w-6xl`) estilo CRM para visualização e edição de tena
 - Slug validation com debounce 500ms: `GET /v1/admin/tenants/check-slug?slug=&exclude_id=`
 - Salvar desabilitado enquanto `slugStatus === 'checking'` ou `'unavailable'`
 - Erros 422 exibidos abaixo dos campos correspondentes
+- **Senhas carregadas sob demanda:** ao clicar no ícone Eye de qualquer schema (sand/prod/log), chama `GET /v1/admin/tenants/{id}/credentials` uma única vez e armazena em estado local; toggle independente por schema (`showSandPass`, `showProdPass`, `showLogPass`)
 
 **TenantsPage — colunas com `render` customizado:**
 - `name` → botão clicável (bold, azul) que abre `TenantShowModal` via `openModal('show', record)`

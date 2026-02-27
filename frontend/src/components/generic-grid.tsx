@@ -120,6 +120,7 @@ export interface GenericGridProps {
   onClearSearchFilters?: () => void;
   onSearch?: (baseFilters: Record<string, string>) => Record<string, string>;
   hasModuleFilters?: boolean;
+  icon?: React.ComponentType<{ className?: string }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -306,6 +307,7 @@ export function GenericGrid({
   onClearSearchFilters,
   onSearch,
   hasModuleFilters = false,
+  icon: Icon,
 }: GenericGridProps) {
   const tenant = getTenantSlug();
   const onDataLoadRef = useRef(onDataLoad);
@@ -728,7 +730,8 @@ export function GenericGrid({
       <Container>
         {/* Cabeçalho da página */}
         <div className="flex items-center justify-between mb-5">
-          <h1 className="text-xl font-semibold">
+          <h1 className="text-xl font-semibold flex items-center gap-2">
+            {Icon && <Icon className="size-6" />}
             {moduleConfig?.name ?? '...'}
           </h1>
           <div className="flex items-center gap-2">

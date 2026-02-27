@@ -1,12 +1,18 @@
 import { getAuth } from '@/auth/lib/helpers';
+import { isSandbox } from '@/lib/tenant';
 
-const API_URL = import.meta.env.VITE_API_URL as string;
+function getApiUrl(): string {
+  const base = import.meta.env.VITE_API_URL as string;
+  return isSandbox()
+    ? base.replace('://api.', '://api.sandbox.')
+    : base;
+}
 
 export async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
   const auth = getAuth();
   const token = auth?.access_token;
 
-  return fetch(`${API_URL}${path}`, {
+  return fetch(`${getApiUrl()}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',

@@ -39,6 +39,7 @@ export function NavbarMenu() {
 
   const dashboardItems = [
     { title: 'Geral', path: '/dashboard' },
+    ...(isAdmin ? [{ title: 'Plataformas', path: '/platforms' }] : []),
     ...(isAdmin ? [{ title: 'Tenants', path: '/tenants' }] : []),
     { title: 'Pessoas', path: '/pessoas' },
     { title: 'Produtos', path: '/produtos' },
