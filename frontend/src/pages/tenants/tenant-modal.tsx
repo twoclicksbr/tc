@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { GenericModal } from '@/components/generic-modal';
 import { apiGet } from '@/lib/api';
 import { TenantShowModal } from './tenant-show-modal';
 
 export interface TenantForEdit {
   id: number;
+  platform_id: number | null;
   name: string;
   slug: string;
   db_name: string;
@@ -18,6 +20,11 @@ export interface TenantForEdit {
   created_at: string;
   updated_at: string;
   deleted_at?: string | null;
+}
+
+interface Platform {
+  id: number;
+  name: string;
 }
 
 interface TenantModalProps {
@@ -59,6 +66,8 @@ export function TenantModal({ open, onOpenChange, mode, record, onSuccess, modul
   // Dispatcher: 'edit' e 'show' abrem o modal CRM; os demais vão direto para GenericModal
   const [renderMode, setRenderMode] = useState<RenderMode>(toRenderMode(mode));
 
+  const [platforms, setPlatforms] = useState<Platform[]>([]);
+  const [platformId, setPlatformId] = useState<number | null>(null);
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [slugManual, setSlugManual] = useState(false);
@@ -66,16 +75,26 @@ export function TenantModal({ open, onOpenChange, mode, record, onSuccess, modul
   const [expirationDate, setExpirationDate] = useState(defaultExpiration);
   const [errors, setErrors] = useState<FieldErrors>({});
 
+  // Carrega plataformas disponíveis ao abrir
+  useEffect(() => {
+    if (!open) return;
+    apiGet<{ data: Platform[] }>('/v1/admin/platforms?per_page=100&active=true')
+      .then((res) => setPlatforms(res.data))
+      .catch(() => {});
+  }, [open]);
+
   // Reset ao abrir: define renderMode e preenche o formulário
   useEffect(() => {
     if (open) {
       setRenderMode(toRenderMode(mode));
       if (record) {
+        setPlatformId(record.platform_id ?? null);
         setName(record.name);
         setSlug(record.slug);
         setSlugManual(true);
         setExpirationDate(record.expiration_date?.split('T')[0] ?? defaultExpiration());
       } else {
+        setPlatformId(null);
         setName('');
         setSlug('');
         setSlugManual(false);
@@ -128,7 +147,7 @@ export function TenantModal({ open, onOpenChange, mode, record, onSuccess, modul
 
   function handleGetData(): Record<string, unknown> | null {
     if (slugStatus === 'checking' || slugStatus === 'unavailable') return null;
-    return { name, slug, expiration_date: expirationDate };
+    return { platform_id: platformId, name, slug, expiration_date: expirationDate };
   }
 
   function handleErrors(errs: Record<string, string[]>) {
@@ -142,6 +161,7 @@ export function TenantModal({ open, onOpenChange, mode, record, onSuccess, modul
         open={open && renderMode === 'show-crm'}
         onOpenChange={(isOpen) => { if (!isOpen) onOpenChange(false); }}
         record={record}
+        platforms={platforms}
         onSuccess={() => { onSuccess(); onOpenChange(false); }}
       />
 
@@ -157,7 +177,34 @@ export function TenantModal({ open, onOpenChange, mode, record, onSuccess, modul
           onSuccess={onSuccess}
           onGetData={handleGetData}
           onErrors={handleErrors}
+          saveDisabled={
+            slugStatus === 'checking' ||
+            slugStatus === 'unavailable' ||
+            (renderMode === 'create' && (!platformId || !name.trim() || !slug.trim() || !expirationDate))
+          }
         >
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="tenant-platform">
+              Plataforma <span className="text-destructive">*</span>
+            </Label>
+            <Select
+              value={platformId ? String(platformId) : ''}
+              onValueChange={(v) => setPlatformId(Number(v))}
+            >
+              <SelectTrigger id="tenant-platform">
+                <SelectValue placeholder="Selecione a plataforma..." />
+              </SelectTrigger>
+              <SelectContent>
+                {platforms.map((p) => (
+                  <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.platform_id && (
+              <p className="text-sm text-destructive">{errors.platform_id[0]}</p>
+            )}
+          </div>
+
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="tenant-name">
               Nome <span className="text-destructive">*</span>

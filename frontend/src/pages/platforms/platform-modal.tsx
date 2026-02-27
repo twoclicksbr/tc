@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Input } from '@/components/ui/input';
+import { Input, InputAddon, InputGroup } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { GenericModal } from '@/components/generic-modal';
 import { apiGet } from '@/lib/api';
@@ -8,6 +8,7 @@ import { PlatformShowModal } from './platform-show-modal';
 export interface PlatformForEdit {
   id: number;
   name: string;
+  domain: string;
   slug: string;
   db_name: string;
   sand_user?: string;
@@ -60,6 +61,7 @@ export function PlatformModal({ open, onOpenChange, mode, record, onSuccess, mod
   const [renderMode, setRenderMode] = useState<RenderMode>(toRenderMode(mode));
 
   const [name, setName] = useState('');
+  const [domain, setDomain] = useState('');
   const [slug, setSlug] = useState('');
   const [slugManual, setSlugManual] = useState(false);
   const [slugStatus, setSlugStatus] = useState<SlugStatus>('idle');
@@ -72,11 +74,13 @@ export function PlatformModal({ open, onOpenChange, mode, record, onSuccess, mod
       setRenderMode(toRenderMode(mode));
       if (record) {
         setName(record.name);
+        setDomain(record.domain ?? '');
         setSlug(record.slug);
         setSlugManual(true);
         setExpirationDate(record.expiration_date?.split('T')[0] ?? defaultExpiration());
       } else {
         setName('');
+        setDomain('');
         setSlug('');
         setSlugManual(false);
         setExpirationDate(defaultExpiration());
@@ -128,7 +132,7 @@ export function PlatformModal({ open, onOpenChange, mode, record, onSuccess, mod
 
   function handleGetData(): Record<string, unknown> | null {
     if (slugStatus === 'checking' || slugStatus === 'unavailable') return null;
-    return { name, slug, expiration_date: expirationDate };
+    return { name, domain, slug, expiration_date: expirationDate };
   }
 
   function handleErrors(errs: Record<string, string[]>) {
@@ -157,6 +161,11 @@ export function PlatformModal({ open, onOpenChange, mode, record, onSuccess, mod
           onSuccess={onSuccess}
           onGetData={handleGetData}
           onErrors={handleErrors}
+          saveDisabled={
+            slugStatus === 'checking' ||
+            slugStatus === 'unavailable' ||
+            (renderMode === 'create' && (!name.trim() || !domain.trim() || !slug.trim() || !expirationDate))
+          }
         >
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="platform-name">
@@ -170,6 +179,24 @@ export function PlatformModal({ open, onOpenChange, mode, record, onSuccess, mod
             />
             {errors.name && (
               <p className="text-sm text-destructive">{errors.name[0]}</p>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="platform-domain">
+              Domínio <span className="text-destructive">*</span>
+            </Label>
+            <InputGroup>
+              <InputAddon>https://</InputAddon>
+              <Input
+                id="platform-domain"
+                value={domain}
+                onChange={(e) => setDomain(e.target.value)}
+                placeholder="exemplo.com.br"
+              />
+            </InputGroup>
+            {errors.domain && (
+              <p className="text-sm text-destructive">{errors.domain[0]}</p>
             )}
           </div>
 

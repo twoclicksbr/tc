@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Building2, CalendarIcon } from 'lucide-react';
@@ -9,12 +9,25 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { apiGet } from '@/lib/api';
 
 // moduleId=1 — único módulo criado pelo MainSeeder em tc_main (firstOrCreate, sempre ID=1 após migrate:fresh)
 const MODULE_ID = 1;
 
+interface Platform {
+  id: number;
+  name: string;
+}
+
 export function TenantsPage() {
+  const [platforms, setPlatforms] = useState<Platform[]>([]);
   const [validityRange, setValidityRange] = useState<DateRange | undefined>(undefined);
+
+  useEffect(() => {
+    apiGet<{ data: Platform[] }>('/v1/admin/platforms?per_page=100&active=true')
+      .then((res) => setPlatforms(res.data))
+      .catch(() => {});
+  }, []);
 
   const handleDataLoad = useCallback((_data: Record<string, unknown>[]) => {}, []);
 
@@ -88,6 +101,16 @@ export function TenantsPage() {
               {String(value ?? '—')}
             </button>
           ),
+        },
+        {
+          key: 'platform_id',
+          label: 'Plataforma',
+          meta: { style: { width: '12%' } },
+          render: (v) => {
+            if (!v) return <span className="text-muted-foreground text-xs">—</span>;
+            const p = platforms.find((p) => p.id === Number(v));
+            return p ? <Badge variant="secondary" appearance="light">{p.name}</Badge> : <span className="text-muted-foreground text-xs">—</span>;
+          },
         },
         { key: 'slug',    label: 'Slug',  sortable: true, meta: { style: { width: '12%' } }, render: (v) => <Badge variant="info" appearance="light">{String(v ?? '—')}</Badge> },
         { key: 'db_name', label: 'Banco',                meta: { style: { width: '12%' } }, render: (v) => <Badge variant="info" appearance="light">{String(v ?? '—')}</Badge> },

@@ -72,6 +72,23 @@ class ModuleController extends Controller
             $query->whereBetween('expiration_date', [$expirationFrom, $expirationTo]);
         }
 
+        // Filtro por aniversariantes: birth_month_day_from/to no formato MM-DD (ignora ano)
+        if (in_array('birth_date', $fillable, true)
+            && ($birthFrom = $request->input('birth_month_day_from'))
+            && ($birthTo   = $request->input('birth_month_day_to'))
+        ) {
+            if ($birthFrom <= $birthTo) {
+                // Período normal: ex 03-01 até 03-31
+                $query->whereRaw("TO_CHAR(birth_date, 'MM-DD') BETWEEN ? AND ?", [$birthFrom, $birthTo]);
+            } else {
+                // Período com virada de ano: ex 12-20 até 01-10
+                $query->where(function ($q) use ($birthFrom, $birthTo) {
+                    $q->whereRaw("TO_CHAR(birth_date, 'MM-DD') >= ?", [$birthFrom])
+                      ->orWhereRaw("TO_CHAR(birth_date, 'MM-DD') <= ?", [$birthTo]);
+                });
+            }
+        }
+
         // Filtro por active
         if ($request->has('active')) {
             $query->where('active', $request->boolean('active'));

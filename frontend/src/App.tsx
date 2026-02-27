@@ -5,6 +5,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { LoadingBarContainer } from 'react-top-loading-bar';
 import { Toaster } from '@/components/ui/sonner';
 import { AuthProvider } from './auth/providers/laravel-provider';
+import { PlatformProvider } from './providers/platform-provider';
 import { I18nProvider } from './providers/i18n-provider';
 import { ModulesProvider } from './providers/modules-provider';
 import { QueryProvider } from './providers/query-provider';
@@ -20,6 +21,7 @@ export function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <PlatformProvider>
         <SettingsProvider>
           <ThemeProvider>
             <I18nProvider>
@@ -40,6 +42,7 @@ export function App() {
             </I18nProvider>
           </ThemeProvider>
         </SettingsProvider>
+        </PlatformProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

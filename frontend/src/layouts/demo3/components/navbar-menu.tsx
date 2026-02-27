@@ -1,6 +1,7 @@
 import { ChevronDown } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
-import { getTenantSlug } from '@/lib/tenant';
+import { getUrlTenantSlug } from '@/lib/tenant';
+import { usePlatform } from '@/providers/platform-provider';
 import { MENU_SIDEBAR, MENU_SIDEBAR_CUSTOM } from '@/config/menu.config';
 import { MenuConfig } from '@/config/types';
 import { cn } from '@/lib/utils';
@@ -35,12 +36,13 @@ export function NavbarMenu() {
 
   const { isActive, hasActiveChild } = useMenu(pathname);
 
-  const isAdmin = getTenantSlug() === 'admin';
+  const isAdmin = getUrlTenantSlug() === 'admin';
+  const { selectedPlatform } = usePlatform();
 
   const dashboardItems = [
     { title: 'Geral', path: '/dashboard' },
-    ...(isAdmin ? [{ title: 'Plataformas', path: '/platforms' }] : []),
-    ...(isAdmin ? [{ title: 'Tenants', path: '/tenants' }] : []),
+    ...(isAdmin && !selectedPlatform ? [{ title: 'Plataformas', path: '/platforms' }] : []),
+    ...(isAdmin ? [{ title: 'Empresas', path: '/tenants' }] : []),
     { title: 'Pessoas', path: '/pessoas' },
     { title: 'Produtos', path: '/produtos' },
     { title: 'Comercial', path: '/comercial' },

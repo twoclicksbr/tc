@@ -13,18 +13,6 @@ class PlatformRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        if ($this->isMethod('POST')) {
-            $base = str_replace('-', '_', $this->input('slug', ''));
-            $this->merge([
-                'db_name'       => $base,
-                'sand_user'     => 'sand_' . $base,
-                'sand_password' => \Illuminate\Support\Str::random(32),
-                'prod_user'     => 'prod_' . $base,
-                'prod_password' => \Illuminate\Support\Str::random(32),
-                'log_user'      => 'log_' . $base,
-                'log_password'  => \Illuminate\Support\Str::random(32),
-            ]);
-        }
     }
 
     public function rules(): array
@@ -33,6 +21,7 @@ class PlatformRequest extends FormRequest
 
         return [
             'name'            => ['required', 'string', 'max:255'],
+            'domain'          => ['required', 'string', 'max:255', 'unique:main.platforms,domain' . ($platformId ? ',' . $platformId : '')],
             'slug'            => ['required', 'string', 'max:255', 'unique:main.platforms,slug' . ($platformId ? ',' . $platformId : '')],
             'db_name'         => ['sometimes', 'required', 'string', 'max:255'],
             'sand_user'       => ['sometimes', 'nullable', 'string', 'max:255'],

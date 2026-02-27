@@ -11,7 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
+import { Input, InputAddon, InputGroup } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
@@ -46,10 +46,10 @@ function slugify(value: string): string {
 
 function formatDateTimeBR(value?: string | null): string {
   if (!value) return '—';
-  return new Date(value).toLocaleString('pt-BR', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  });
+  const d = new Date(value);
+  const date = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const time = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  return `${date} ${time}`;
 }
 
 function formatId(id: number): string {
@@ -82,17 +82,9 @@ function formatExpiration(v: string | null | undefined): React.ReactNode {
   return <Badge variant={variant} appearance="light">{label}</Badge>;
 }
 
-function InfoField({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-0.5">
-      <p className="text-sm text-muted-foreground">{label}</p>
-      <div className="text-sm font-medium">{children}</div>
-    </div>
-  );
-}
-
 export function PlatformShowModal({ open, onOpenChange, record, onSuccess }: PlatformShowModalProps) {
   const [name, setName]                 = useState('');
+  const [domain, setDomain]             = useState('');
   const [slug, setSlug]                 = useState('');
   const [slugManual, setSlugManual]     = useState(false);
   const [slugStatus, setSlugStatus]     = useState<SlugStatus>('idle');
@@ -112,6 +104,7 @@ export function PlatformShowModal({ open, onOpenChange, record, onSuccess }: Pla
   useEffect(() => {
     if (open && record) {
       setName(record.name);
+      setDomain(record.domain ?? '');
       setSlug(record.slug);
       setSlugManual(true);
       setExpirationDate(record.expiration_date?.split('T')[0] ?? '');
@@ -184,7 +177,7 @@ export function PlatformShowModal({ open, onOpenChange, record, onSuccess }: Pla
     if (!record) return;
     setSaving(true);
     try {
-      await apiPut(`/v1/admin/platforms/${record.id}`, { name, slug, expiration_date: expirationDate, active });
+      await apiPut(`/v1/admin/platforms/${record.id}`, { name, domain, slug, expiration_date: expirationDate, active });
       onSuccess();
       onOpenChange(false);
     } catch (err: unknown) {
@@ -216,7 +209,7 @@ export function PlatformShowModal({ open, onOpenChange, record, onSuccess }: Pla
 
   if (!record) return null;
 
-  const dbLabel = `tc_${record.db_name}`;
+  const dbLabel = record.db_name;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -227,14 +220,20 @@ export function PlatformShowModal({ open, onOpenChange, record, onSuccess }: Pla
 
         <DialogBody className="p-0 flex flex-col flex-1">
 
-          {/* Linha full-width: #ID + Nome + Badge Ativo/Inativo */}
-          <div className="flex items-center gap-2 flex-wrap px-6 py-3">
-            <span className="text-muted-foreground font-normal text-base shrink-0">{formatId(record.id)}</span>
-            <span className="text-xl font-bold leading-tight">{record.name}</span>
-            {record.active
-              ? <Badge variant="success" appearance="light">Ativo</Badge>
-              : <Badge variant="destructive" appearance="light">Inativo</Badge>
-            }
+          {/* #ID + Nome + Badge Ativo/Inativo | Validade (direita) */}
+          <div className="flex items-center justify-between gap-2 px-6 py-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-muted-foreground font-normal text-base shrink-0">{formatId(record.id)}</span>
+              <span className="text-xl font-bold leading-tight truncate">{record.name}</span>
+              {record.active
+                ? <Badge variant="success" appearance="light" className="shrink-0">Ativo</Badge>
+                : <Badge variant="destructive" appearance="light" className="shrink-0">Inativo</Badge>
+              }
+            </div>
+            <div className="shrink-0 flex flex-col items-end gap-0.5">
+              <span className="text-xs text-muted-foreground">Validade</span>
+              {formatExpiration(record.expiration_date)}
+            </div>
           </div>
 
           {/* Datas — abaixo do nome */}
@@ -254,31 +253,10 @@ export function PlatformShowModal({ open, onOpenChange, record, onSuccess }: Pla
 
           <Separator />
 
-          <div className="flex flex-1 min-h-[400px] items-start">
+          <div className="flex flex-1 min-h-[400px]">
 
-            {/* Coluna esquerda */}
-            <div className="w-[20%] shrink-0 border-r border-border px-6 pb-0 pt-3 flex flex-col gap-3 self-stretch">
-
-              {/* Validade / Slug / Banco / Usuário — coluna única */}
-              <InfoField label="Validade">
-                {formatExpiration(record.expiration_date)}
-              </InfoField>
-              <InfoField label="Slug">
-                <Badge appearance="light">{record.slug || '—'}</Badge>
-              </InfoField>
-              <InfoField label="Banco">
-                <Badge appearance="light">{record.db_name || '—'}</Badge>
-              </InfoField>
-              <InfoField label="Usuário">
-                <Badge appearance="light">
-                  <span className="font-mono">{record.sand_user || '—'}</span>
-                </Badge>
-              </InfoField>
-
-            </div>
-
-            {/* Coluna direita */}
-            <div className="flex-1 min-w-0 flex flex-col self-stretch">
+            {/* Tabs — largura total */}
+            <div className="w-full flex flex-col">
               <Tabs defaultValue="overview" className="flex flex-col flex-1">
                 <TabsList variant="line" className="px-4 shrink-0">
                   <TabsTrigger value="overview">Visão Geral</TabsTrigger>
@@ -291,8 +269,8 @@ export function PlatformShowModal({ open, onOpenChange, record, onSuccess }: Pla
                 <TabsContent value="overview" className="flex flex-col flex-1 pt-6 px-6 pb-0">
                   <div className="flex flex-col gap-4 flex-1">
 
-                    {/* Nome + Slug + Validade — mesma linha */}
-                    <div className="grid grid-cols-3 gap-4">
+                    {/* Nome + Domínio + Slug + Validade — mesma linha */}
+                    <div className="grid grid-cols-4 gap-4">
                       <div className="flex flex-col gap-1.5">
                         <Label htmlFor="show-name">
                           Nome <span className="text-destructive">*</span>
@@ -304,6 +282,24 @@ export function PlatformShowModal({ open, onOpenChange, record, onSuccess }: Pla
                         />
                         {errors.name && (
                           <p className="text-sm text-destructive">{errors.name[0]}</p>
+                        )}
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="show-domain">
+                          Domínio <span className="text-destructive">*</span>
+                        </Label>
+                        <InputGroup>
+                          <InputAddon>https://</InputAddon>
+                          <Input
+                            id="show-domain"
+                            value={domain}
+                            onChange={(e) => setDomain(e.target.value)}
+                            placeholder="exemplo.com.br"
+                          />
+                        </InputGroup>
+                        {errors.domain && (
+                          <p className="text-sm text-destructive">{errors.domain[0]}</p>
                         )}
                       </div>
 

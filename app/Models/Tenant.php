@@ -12,6 +12,7 @@ class Tenant extends Model
     protected $connection = 'main';
 
     protected $fillable = [
+        'platform_id',
         'name',
         'slug',
         'db_name',
@@ -35,4 +36,9 @@ class Tenant extends Model
         'expiration_date' => 'date:Y-m-d',
         'active'          => 'boolean',
     ];
+
+    public function platform()
+    {
+        return $this->belongsTo(Platform::class);
+    }
 }

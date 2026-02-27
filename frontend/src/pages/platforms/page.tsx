@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import { usePlatform } from '@/providers/platform-provider';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { CalendarIcon, Layers } from 'lucide-react';
@@ -14,9 +15,12 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 const MODULE_ID = 3;
 
 export function PlatformsPage() {
+  const { refreshPlatforms } = usePlatform();
   const [validityRange, setValidityRange] = useState<DateRange | undefined>(undefined);
 
-  const handleDataLoad = useCallback((_data: Record<string, unknown>[]) => {}, []);
+  const handleDataLoad = useCallback((_data: Record<string, unknown>[]) => {
+    refreshPlatforms();
+  }, [refreshPlatforms]);
 
   const handleClearSearchFilters = useCallback(() => {
     setValidityRange(undefined);
@@ -89,6 +93,7 @@ export function PlatformsPage() {
             </button>
           ),
         },
+        { key: 'domain',  label: 'Domínio', sortable: true, meta: { style: { width: '18%' } } },
         { key: 'slug',    label: 'Slug',  sortable: true, meta: { style: { width: '12%' } }, render: (v) => <Badge variant="info" appearance="light">{String(v ?? '—')}</Badge> },
         { key: 'db_name', label: 'Banco',                meta: { style: { width: '12%' } }, render: (v) => <Badge variant="info" appearance="light">{String(v ?? '—')}</Badge> },
         {

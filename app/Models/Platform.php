@@ -13,6 +13,7 @@ class Platform extends Model
 
     protected $fillable = [
         'name',
+        'domain',
         'slug',
         'db_name',
         'sand_user',
@@ -35,4 +36,9 @@ class Platform extends Model
         'expiration_date' => 'date:Y-m-d',
         'active'          => 'boolean',
     ];
+
+    public function tenants()
+    {
+        return $this->hasMany(Tenant::class);
+    }
 }

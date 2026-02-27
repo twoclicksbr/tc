@@ -40,6 +40,7 @@ import { DataGridTableDndRows } from '@/components/ui/data-grid-table-dnd-rows';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -248,7 +249,6 @@ function alignTextClass(align?: 'start' | 'center' | 'end'): string {
 // ---------------------------------------------------------------------------
 
 function renderCellByType(value: unknown, col: ColumnConfig, record: AnyRecord, openModal: (mode: RowMode, record: AnyRecord) => void): React.ReactNode {
-  console.log('raw cell value:', col.key, value);
   if (col.render) return col.render(value, record, openModal);
   switch (col.type) {
     case 'date':
@@ -619,7 +619,7 @@ export function GenericGrid({
     if (showActive) {
       cols.push({
         accessorKey: 'active',
-        header: 'Ativo',
+        header: 'Status',
         cell: ({ getValue }) =>
           getValue<boolean>() ? (
             <Badge variant="success" appearance="light" size="sm">Ativo</Badge>
@@ -828,7 +828,8 @@ export function GenericGrid({
             <div className="grid grid-cols-12 gap-4 items-end">
 
               {/* ID — col-span-1 */}
-              <div className="col-span-1">
+              <div className="col-span-1 flex flex-col gap-1.5">
+                <Label className="text-xs text-muted-foreground">ID</Label>
                 <Input
                   type="text"
                   inputMode="numeric"
@@ -840,7 +841,8 @@ export function GenericGrid({
               </div>
 
               {/* Tipo — col-span-2 */}
-              <div className="col-span-2">
+              <div className="col-span-2 flex flex-col gap-1.5">
+                <Label className="text-xs text-muted-foreground">Tipo</Label>
                 <Select value={searchContentMode} onValueChange={setSearchContentMode}>
                   <SelectTrigger className="w-full">
                     <SelectValue />
@@ -854,7 +856,8 @@ export function GenericGrid({
               </div>
 
               {/* Nome — col-span-4 */}
-              <div className="col-span-4">
+              <div className="col-span-4 flex flex-col gap-1.5">
+                <Label className="text-xs text-muted-foreground">Nome</Label>
                 <Input
                   type="text"
                   placeholder="Nome"
@@ -864,7 +867,8 @@ export function GenericGrid({
               </div>
 
               {/* Data — col-span-2 */}
-              <div className="col-span-2">
+              <div className="col-span-2 flex flex-col gap-1.5">
+                <Label className="text-xs text-muted-foreground">Data</Label>
                 <Select value={searchDateType} onValueChange={setSearchDateType}>
                   <SelectTrigger className="w-full">
                     <SelectValue />
@@ -878,7 +882,8 @@ export function GenericGrid({
               </div>
 
               {/* Período — col-span-3 */}
-              <div className="col-span-3">
+              <div className="col-span-3 flex flex-col gap-1.5">
+                <Label className="text-xs text-muted-foreground">Período</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="outline" className="w-full justify-start font-normal text-left">
@@ -919,8 +924,9 @@ export function GenericGrid({
             {/* Linha 3 — Registro + Ativo */}
             <div className="mt-4 grid grid-cols-12 gap-4 items-end">
 
-              {/* Registro */}
-              <div className="col-span-3">
+              {/* Registros */}
+              <div className="col-span-3 flex flex-col gap-1.5">
+                <Label className="text-xs text-muted-foreground">Registros</Label>
                 <Select value={searchPerPage} onValueChange={setSearchPerPage}>
                   <SelectTrigger className="w-full">
                     <SelectValue />
@@ -935,8 +941,9 @@ export function GenericGrid({
                 </Select>
               </div>
 
-              {/* Ativo */}
-              <div className="col-span-3">
+              {/* Status */}
+              <div className="col-span-3 flex flex-col gap-1.5">
+                <Label className="text-xs text-muted-foreground">Status</Label>
                 <Select value={searchActive} onValueChange={setSearchActive}>
                   <SelectTrigger className="w-full">
                     <SelectValue />

@@ -1,5 +1,5 @@
 import { AuthModel, UserModel } from '@/auth/lib/models';
-import { getTenantSlug, isSandbox } from '@/lib/tenant';
+import { getUrlTenantSlug, isSandbox } from '@/lib/tenant';
 
 function getApiUrl(): string {
   const base = import.meta.env.VITE_API_URL as string;
@@ -46,7 +46,7 @@ async function apiFetch(
 
 export const LaravelAdapter = {
   async login(email: string, password: string): Promise<{ auth: AuthModel; user: UserModel }> {
-    const res = await apiFetch(`/v1/${getTenantSlug()}/auth/login`, {
+    const res = await apiFetch(`/v1/${getUrlTenantSlug()}/auth/login`, {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
@@ -63,14 +63,14 @@ export const LaravelAdapter = {
   },
 
   async logout(token: string): Promise<void> {
-    await apiFetch(`/v1/${getTenantSlug()}/auth/logout`, {
+    await apiFetch(`/v1/${getUrlTenantSlug()}/auth/logout`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
     });
   },
 
   async me(token: string): Promise<UserModel | null> {
-    const res = await apiFetch(`/v1/${getTenantSlug()}/auth/me`, {
+    const res = await apiFetch(`/v1/${getUrlTenantSlug()}/auth/me`, {
       headers: { Authorization: `Bearer ${token}` },
     });
 

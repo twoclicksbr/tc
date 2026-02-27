@@ -24,19 +24,37 @@ class TenantDatabaseService
         $logCreated  = false;
 
         try {
-            // 1. Criar banco de dados
-            DB::connection('main')->statement("CREATE DATABASE \"{$dbName}\"");
-            $dbCreated = true;
+            // 1. Criar banco de dados (só se ainda não existir)
+            $dbExists = DB::connection('main')->selectOne("SELECT 1 FROM pg_database WHERE datname = ?", [$dbName]);
+            if (!$dbExists) {
+                DB::connection('main')->statement("CREATE DATABASE \"{$dbName}\"");
+                $dbCreated = true;
+            }
 
-            // 2. Criar 3 users PostgreSQL
-            DB::connection('main')->statement("CREATE USER \"{$sandUser}\" WITH PASSWORD '{$sandPass}'");
-            $sandCreated = true;
+            // 2. Criar 3 users PostgreSQL (ou atualizar senha se já existirem)
+            $sandExists = DB::connection('main')->selectOne("SELECT 1 FROM pg_roles WHERE rolname = ?", [$sandUser]);
+            if (!$sandExists) {
+                DB::connection('main')->statement("CREATE USER \"{$sandUser}\" WITH PASSWORD '{$sandPass}'");
+                $sandCreated = true;
+            } else {
+                DB::connection('main')->statement("ALTER USER \"{$sandUser}\" WITH PASSWORD '{$sandPass}'");
+            }
 
-            DB::connection('main')->statement("CREATE USER \"{$prodUser}\" WITH PASSWORD '{$prodPass}'");
-            $prodCreated = true;
+            $prodExists = DB::connection('main')->selectOne("SELECT 1 FROM pg_roles WHERE rolname = ?", [$prodUser]);
+            if (!$prodExists) {
+                DB::connection('main')->statement("CREATE USER \"{$prodUser}\" WITH PASSWORD '{$prodPass}'");
+                $prodCreated = true;
+            } else {
+                DB::connection('main')->statement("ALTER USER \"{$prodUser}\" WITH PASSWORD '{$prodPass}'");
+            }
 
-            DB::connection('main')->statement("CREATE USER \"{$logUser}\" WITH PASSWORD '{$logPass}'");
-            $logCreated = true;
+            $logExists = DB::connection('main')->selectOne("SELECT 1 FROM pg_roles WHERE rolname = ?", [$logUser]);
+            if (!$logExists) {
+                DB::connection('main')->statement("CREATE USER \"{$logUser}\" WITH PASSWORD '{$logPass}'");
+                $logCreated = true;
+            } else {
+                DB::connection('main')->statement("ALTER USER \"{$logUser}\" WITH PASSWORD '{$logPass}'");
+            }
 
             // 3. Conceder CONNECT no banco para cada user
             DB::connection('main')->statement("GRANT CONNECT ON DATABASE \"{$dbName}\" TO \"{$sandUser}\"");

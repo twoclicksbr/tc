@@ -11,7 +11,8 @@ import {
   Users,
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
-import { getTenantSlug } from '@/lib/tenant';
+import { getUrlTenantSlug } from '@/lib/tenant';
+import { usePlatform } from '@/providers/platform-provider';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
@@ -30,11 +31,12 @@ export interface Item {
 export function SidebarMenu() {
   const { pathname } = useLocation();
 
-  const isAdmin = getTenantSlug() === 'admin';
+  const isAdmin = getUrlTenantSlug() === 'admin';
+  const { selectedPlatform } = usePlatform();
 
   const items: Item[] = [
-    ...(isAdmin ? [{ icon: Layers,    path: '/platforms', title: 'Plataformas' }] : []),
-    ...(isAdmin ? [{ icon: Building2, path: '/tenants',   title: 'Tenants' }] : []),
+    ...(isAdmin && !selectedPlatform ? [{ icon: Layers,    path: '/platforms', title: 'Plataformas' }] : []),
+    ...(isAdmin ? [{ icon: Building2, path: '/tenants',   title: 'Empresas' }] : []),
     { icon: Users,            path: '/pessoas',      title: 'Pessoas' },
     { icon: Package,          path: '/produtos',     title: 'Produtos' },
     { icon: ShoppingCart,     path: '/compras',      title: 'Compras' },

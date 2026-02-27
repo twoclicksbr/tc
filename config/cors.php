@@ -24,7 +24,7 @@ return [
     ],
 
     'allowed_origins_patterns' => [
-        '#^https?://.*\.tc\.test(:\d+)?$#',
+        '#^https?://(.*\.)?tc\.test(:\d+)?$#',
         '#^https?://.*\.sandbox\.tc\.test(:\d+)?$#',
     ],
 

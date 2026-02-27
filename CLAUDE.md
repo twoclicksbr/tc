@@ -171,8 +171,8 @@ id → campos específicos → order (default 1) → active (default true) → t
 
 | Tabela | Campos |
 |--------|--------|
-| `tenants` | name, slug (unique), db_name, sand_user, sand_password (encrypted), prod_user, prod_password (encrypted), log_user, log_password (encrypted), expiration_date, order, active |
-| `platforms` | name, slug (unique), db_name, sand_user, sand_password (encrypted), prod_user, prod_password (encrypted), log_user, log_password (encrypted), expiration_date, order, active |
+| `tenants` | platform_id (FK platforms), name, slug (unique), db_name, sand_user, sand_password (encrypted), prod_user, prod_password (encrypted), log_user, log_password (encrypted), expiration_date, order, active |
+| `platforms` | name, domain, slug (unique), db_name, sand_user, sand_password (encrypted), prod_user, prod_password (encrypted), log_user, log_password (encrypted), expiration_date, order, active |
 | `people` | name, birth_date, order, active |
 | `users` | person_id (FK people), email, password, active |
 | `modules` | (mesmos campos que tenant — ver seção Configuração) |
@@ -248,7 +248,7 @@ Todas protegidas por `auth:sanctum`. `{module}` = `name_url` do registro na tabe
 
 | Método | URL | Método Controller | Descrição |
 |--------|-----|-------------------|-----------|
-| GET | `api.{domínio}/v1/{tenant}/{module}` | `index` | Lista paginada com sort, per_page e filtros (search_id, search_name, search_type, date_type, date_from, date_to, expiration_date_from, expiration_date_to, active, include_deleted) |
+| GET | `api.{domínio}/v1/{tenant}/{module}` | `index` | Lista paginada com sort, per_page e filtros (search_id, search_name, search_type, date_type, date_from, date_to, expiration_date_from, expiration_date_to, birth_month_day_from, birth_month_day_to, active, include_deleted) |
 | POST | `api.{domínio}/v1/{tenant}/{module}` | `store` | Cria registro (usa Request dinâmica) |
 | GET | `api.{domínio}/v1/{tenant}/{module}/check-slug` | `checkSlug` | Verifica disponibilidade de slug (`?slug=&exclude_id=`) |
 | GET | `api.{domínio}/v1/{tenant}/{module}/{id}` | `show` | Exibe registro (inclui soft-deleted via `withTrashed`) |
@@ -263,7 +263,7 @@ Todas protegidas por `auth:sanctum`. `{module}` = `name_url` do registro na tabe
 | `paths` | `['api/*', 'v1/*', 'sanctum/csrf-cookie']` |
 | `allowed_methods` | `['*']` |
 | `allowed_origins` | `['http://localhost:5173']` |
-| `allowed_origins_patterns` | `['#^https?://.*\.tc\.test(:\d+)?$#']` (todos os subdomínios) |
+| `allowed_origins_patterns` | `['#^https?://(.*\.)?tc\.test(:\d+)?$#']` (todos os subdomínios + domínio base) |
 | `allowed_headers` | `['Content-Type', 'Authorization', 'Accept', 'X-Requested-With']` |
 | `supports_credentials` | `true` |
 
@@ -271,8 +271,8 @@ Todas protegidas por `auth:sanctum`. `{module}` = `name_url` do registro na tabe
 
 | Request | Módulo |
 |---------|--------|
-| `TenantRequest` | Validação de tenants — gera `sand_user/password`, `prod_user/password`, `log_user/password` em `prepareForValidation` |
-| `PlatformRequest` | Validação de platforms — mesma lógica do TenantRequest |
+| `TenantRequest` | Validação de tenants — valida `platform_id` (required); credenciais geradas pelo Observer, não mais no Request |
+| `PlatformRequest` | Validação de platforms — valida `name`, `domain`, `slug`, `expiration_date`; credenciais geradas pelo Observer |
 | `PersonRequest` | Validação de pessoas |
 | `UserRequest` | Validação de usuários |
 | `ModuleRequest` | Validação de módulos |
@@ -336,8 +336,8 @@ Garante retorno 401 JSON para requisições não autenticadas. Sem isso, o Larav
 
 | Model | Conexão | Observação |
 |-------|---------|-----------|
-| `Tenant` | `main` (explícita) | Sempre usa tc_main; `$hidden = ['sand_password', 'prod_password', 'log_password']`; casts encrypted nos 3 passwords; cast `expiration_date` como `'date:Y-m-d'` |
-| `Platform` | `main` (explícita) | Mesma estrutura do Tenant; `$hidden = ['sand_password', 'prod_password', 'log_password']`; casts encrypted nos 3 passwords |
+| `Tenant` | `main` (explícita) | Sempre usa tc_main; `$hidden = ['sand_password', 'prod_password', 'log_password']`; casts encrypted nos 3 passwords; cast `expiration_date` como `'date:Y-m-d'`; `platform_id` FK; `platform()` belongsTo |
+| `Platform` | `main` (explícita) | `$hidden = ['sand_password', 'prod_password', 'log_password']`; casts encrypted nos 3 passwords; campo `domain`; `tenants()` hasMany; `db_name` = `{slug}_main` |
 | `User` | default (dinâmica) | Usa a conexão setada pelo middleware |
 | `Person` | default (dinâmica) | Usa a conexão setada pelo middleware; cast `birth_date` como `'date:Y-m-d'` |
 | `Module` | default (dinâmica) | Usa a conexão setada pelo middleware |
@@ -352,12 +352,12 @@ Garante retorno 401 JSON para requisições não autenticadas. Sem isso, o Larav
 | `0001_01_01_000000` | password_reset_tokens, sessions |
 | `0001_01_01_000001` | cache, cache_locks |
 | `0001_01_01_000002` | jobs, job_batches, failed_jobs |
-| `2025_02_24_000004` | tenants |
+| `2025_02_24_000003` | platforms |
+| `2025_02_24_000004` | tenants (com platform_id FK) |
 | `2025_02_24_000005` | people |
 | `2025_02_24_000006` | users (com person_id FK) |
 | `2025_02_24_000007` | personal_access_tokens |
 | `2025_02_24_000008` | modules |
-| `2026_02_27_000009` | platforms |
 
 **`database/migrations/tenant/`** — roda com `--database=tenant_sand` / `--database=tenant_prod`
 
@@ -378,9 +378,9 @@ Garante retorno 401 JSON para requisições não autenticadas. Sem isso, o Larav
 
 | Observer | Gatilho | O que faz |
 |----------|---------|-----------|
-| `TenantObserver` | `creating` | Gera `slug`, `db_name`, `sand_user/password`, `prod_user/password`, `log_user/password`, `expiration_date` |
+| `TenantObserver` | `creating` | Gera `slug`, `db_name` (slug com `_` no lugar de `-`), `sand_user/password`, `prod_user/password`, `log_user/password`, `expiration_date` |
 | `TenantObserver` | `created` | Chama `TenantDatabaseService::provision()` — provisiona banco do novo tenant |
-| `PlatformObserver` | `creating` | Mesma geração automática de campos que `TenantObserver` |
+| `PlatformObserver` | `creating` | Gera `slug`, `db_name` = `{slug}_main`, `sand_user/password`, `prod_user/password`, `log_user/password`, `expiration_date` |
 | `PlatformObserver` | `created` | Chama `PlatformDatabaseService::provision()` — provisiona banco da nova platform |
 
 Registrados em `AppServiceProvider::boot()`.
@@ -389,8 +389,8 @@ Registrados em `AppServiceProvider::boot()`.
 
 | Service | O que faz |
 |---------|-----------|
-| `TenantDatabaseService` | `provision(Tenant)`: cria banco, 3 users (`sand_`, `prod_`, `log_`), dropa schema `public`, cria schemas `sand`/`prod`/`log`, configura ownership e privileges, roda migrations tenant (sand+prod) e log. Rollback completo. |
-| `PlatformDatabaseService` | Mesma lógica que `TenantDatabaseService`, mas para o model `Platform`. |
+| `TenantDatabaseService` | `provision(Tenant)`: cria banco, 3 users (`sand_`, `prod_`, `log_`), dropa schema `public`, cria schemas `sand`/`prod`/`log`, configura ownership e privileges, roda migrations tenant (sand+prod) e log. Idempotente (verifica existência antes de criar). Rollback completo em erro. |
+| `PlatformDatabaseService` | Mesma lógica que `TenantDatabaseService`, mas para o model `Platform`. Cria também user `admin` com acesso a todos os schemas. Idempotente. |
 
 ### Seeders (`database/seeders/`)
 
@@ -418,7 +418,7 @@ php artisan migrate:fresh --database=tenant --path=database/migrations/tenant --
 - **Status:** instalado, rodando em dev
 - **Layout em uso:** `Demo3Layout` (`frontend/src/layouts/demo3/`)
 - **Provider de auth em uso:** `AuthProvider` de `frontend/src/auth/providers/laravel-provider.tsx` (importado em `App.tsx`)
-- **Providers em uso em `App.tsx`:** `AuthProvider`, `SettingsProvider`, `ThemeProvider`, `I18nProvider`, `TooltipsProvider`, `QueryProvider`, `ModulesProvider`
+- **Providers em uso em `App.tsx`:** `AuthProvider`, `PlatformProvider`, `SettingsProvider`, `ThemeProvider`, `I18nProvider`, `TooltipsProvider`, `QueryProvider`, `ModulesProvider`
 
 ### Variáveis de Ambiente (`frontend/.env`)
 
@@ -478,7 +478,7 @@ src/
 ├── lib/                  ← api.ts, supabase.ts, tenant.ts e utilitários
 ├── pages/                ← páginas por módulo (dashboard/, tenants/, pessoas/, produtos/, compras/, vendas/, financeiro/, pagar/, receber/, configuracao/)
 ├── partials/             ← partes reutilizáveis de UI
-├── providers/            ← providers React (tema, i18n, etc.)
+├── providers/            ← providers React (tema, i18n, platform-provider.tsx, etc.)
 └── routing/              ← app-routing.tsx, app-routing-setup.tsx
 ```
 
@@ -490,9 +490,9 @@ O arquivo contém as rotas do Metronic boilerplate (account, network, store, pub
 |------|-----------|-----------|
 | `/` | `Navigate to="/dashboard"` | Redireciona para dashboard |
 | `/dashboard` | `DashboardPage` | Dashboard geral (placeholder) |
-| `/platforms` | `PlatformsPage` | Grid de platforms — CRUD completo via modal ✅ — **só acessível no tenant `admin`**; outros são redirecionados para `/dashboard` |
-| `/tenants` | `TenantsPage` | Grid de tenants — CRUD completo via modal ✅ + modal de pesquisa com filtro de módulo (Validade) ✅ + modal CRM de detalhes (`TenantShowModal`) ✅ — **só acessível no tenant `admin`**; outros são redirecionados para `/dashboard` |
-| `/pessoas` | `PessoasPage` | Cadastro de pessoas (placeholder) |
+| `/platforms` | `PlatformsPage` | Grid de platforms — CRUD completo via modal ✅ + filtro de Validade ✅ + modal CRM (`PlatformShowModal`, max-w-6xl) ✅ — **só acessível no tenant `admin`** |
+| `/tenants` | `TenantsPage` | Grid de tenants — CRUD completo via modal ✅ + filtro de Validade ✅ + modal CRM (`TenantShowModal`, max-w-6xl) ✅ — **só acessível no tenant `admin`** |
+| `/pessoas` | `PessoasPage` | Cadastro de pessoas ✅ — GenericGrid com filtro de aniversário + PersonModal (create/delete/restore) + PersonShowModal (show/edit, CRM max-w-4xl) |
 | `/produtos` | `ProdutosPage` | Produtos (placeholder) |
 | `/compras` | `ComprasPage` | Compras (placeholder) |
 | `/vendas` | `VendasPage` | Vendas (placeholder) |
@@ -501,20 +501,38 @@ O arquivo contém as rotas do Metronic boilerplate (account, network, store, pub
 | `/receber` | `ReceberPage` | Contas a receber (placeholder) |
 | `/configuracao` | `ConfiguracaoPage` | Configurações (placeholder) |
 
+### Platform Selector (`frontend/src/layouts/demo3/components/header-logo.tsx`)
+
+Dropdown no header (visível apenas quando `getUrlTenantSlug() === 'admin'`) para selecionar a plataforma ativa. Consome `platforms` e `selectPlatform` do `PlatformProvider`.
+
+- **Principal** — sem override (acessa `tc_main` diretamente)
+- **{nome da plataforma}** — seta override via `setPlatformOverride(slug)`, fazendo `getTenantSlug()` retornar o slug da plataforma selecionada
+
+### PlatformProvider (`frontend/src/providers/platform-provider.tsx`)
+
+Contexto React que centraliza a lista de plataformas e a plataforma selecionada.
+
+| Valor/Função | Descrição |
+|---|---|
+| `platforms` | Lista de plataformas carregada do backend |
+| `refreshPlatforms()` | Rebusca a lista — chamado em `onDataLoad` do `PlatformsPage` |
+| `selectedPlatform` | Plataforma atualmente selecionada (ou `null` = Principal) |
+| `selectPlatform(platform)` | Seleciona plataforma + seta override no `tenant.ts` |
+
 ### Navbar (`frontend/src/layouts/demo3/components/navbar-menu.tsx`)
 
 O menu horizontal do Demo3 tem um item fixo "Dashboard" como primeiro item (hardcoded no componente), seguido dos itens dinâmicos do `MENU_SIDEBAR[3]` (Account, Billing, Security, etc. — legado Metronic).
 
 **Dropdown Dashboard:**
 - Geral → `/dashboard`
-- Plataformas → `/platforms` — **visível apenas quando `getTenantSlug() === 'admin'`**
-- Tenants → `/tenants` — **visível apenas quando `getTenantSlug() === 'admin'`**
+- Plataformas → `/platforms` — **visível apenas quando `getUrlTenantSlug() === 'admin'`**
+- Tenants → `/tenants` — **visível apenas quando `getUrlTenantSlug() === 'admin'`**
 - Pessoas → `/pessoas`
 - Produtos → `/produtos`
 - Comercial → `/comercial`
 - Financeiro → `/financeiro`
 
-**Sidebar:** itens "Plataformas" (ícone `Layers`) e "Tenants" (ícone `Building2`) visíveis apenas quando `getTenantSlug() === 'admin'`.
+**Sidebar:** itens "Plataformas" (ícone `Layers`) e "Tenants" (ícone `Building2`) visíveis apenas quando `getUrlTenantSlug() === 'admin'`.
 
 ### API Client (`frontend/src/lib/api.ts`)
 
@@ -531,19 +549,22 @@ Wrapper centralizado para chamadas à API Laravel. Injeta `Authorization: Bearer
 ### Tenant Detection (`frontend/src/lib/tenant.ts`)
 
 ```ts
-getTenantSlug(): string
+getUrlTenantSlug(): string   // slug detectado pela URL (subdomínio)
+getTenantSlug(): string      // slug efetivo — retorna override da plataforma selecionada ou getUrlTenantSlug()
+setPlatformOverride(slug: string | null): void
 ```
-- Detecta o tenant pelo subdomínio: `demo.tc.test` → `'demo'`
-- Fallback para `VITE_TENANT_SLUG` quando hostname tem menos de 3 partes (ex: `localhost`); se `VITE_TENANT_SLUG` não estiver definido, loga erro e retorna `''`
-- Usado em `laravel-adapter.ts` para montar as URLs da API dinamicamente
+- `getUrlTenantSlug()` — detecta tenant pelo subdomínio: `demo.tc.test` → `'demo'`; fallback para `VITE_TENANT_SLUG` em localhost
+- `getTenantSlug()` — retorna o override de plataforma (quando uma plataforma foi selecionada no header) ou o slug da URL; usado para chamadas de API e checks de permissão em tela
+- `getUrlTenantSlug()` usado em: `laravel-adapter.ts` (auth), navbar/sidebar (checks de visibilidade admin)
+- `getTenantSlug()` usado em: chamadas de API de módulos, verificações de acesso a rotas
 
 ### Vite Config (`frontend/vite.config.ts`)
 
 ```ts
-server: { host: '0.0.0.0', port: 5173, https: false, allowedHosts: ['.tc.test'] }
+server: { host: '0.0.0.0', port: 5173, https: false, allowedHosts: ['.tc.test', 'tc.test'] }
 ```
 - `host: '0.0.0.0'` — responde em qualquer subdomínio em dev
-- `allowedHosts: ['.tc.test']` — permite todos os subdomínios `*.tc.test`
+- `allowedHosts: ['.tc.test', 'tc.test']` — permite todos os subdomínios `*.tc.test` e o domínio base
 
 ---
 
@@ -558,7 +579,7 @@ server: { host: '0.0.0.0', port: 5173, https: false, allowedHosts: ['.tc.test'] 
 | **Fase 5** | Tela padrão index (grid) — ✅ `GenericGrid` implementado (reutilizável para todos os módulos) |
 | **Fase 5.1** | Tela show/create/edit/delete/restore (página inteira) — não utilizada; projeto usa modal |
 | **Fase 5.2** | Tela show/create/edit/delete/restore (modal) — ✅ `GenericModal` implementado com todos os 5 modos (create/edit/show/delete/restore) |
-| **Fase 6** | Tela people |
+| **Fase 6** | Tela people ✅ — `PessoasPage` + `PersonModal` + `PersonShowModal` implementados |
 | **Fase 7** | Criar migration, model, request, controller das tabelas restantes (type_documents, type_contacts, type_addresses, notes, files, documents, contacts, addresses) |
 
 ---
@@ -573,7 +594,7 @@ server: { host: '0.0.0.0', port: 5173, https: false, allowedHosts: ['.tc.test'] 
 - Busca `moduleConfig` via `GET /v1/{tenant}/modules/{moduleId}` (name, name_url)
 - Colunas configuráveis: `key`, `label`, `sortable`, `type` (text/date/datetime/boolean/badge/currency), `alignHead`, `alignBody`, `meta` (`{ style?: CSSProperties }`) — largura via `meta: { style: { width: '12%' } }`
 - Prop `render` na `ColumnConfig` — renderer customizado: `(value, record, openModal) => ReactNode`; tem precedência sobre `type`
-- Colunas padrão: drag handle, checkbox, id, active (badge) — toggle via props `showDrag`, `showCheckbox`, `showId`, `showActive`
+- Colunas padrão: drag handle, checkbox, id, active (badge com label "Status" no thead) — toggle via props `showDrag`, `showCheckbox`, `showId`, `showActive`
 - Ações por linha extraídas para `GridActions` (`frontend/src/components/grid-actions.tsx`) — show, edit, delete, restore — toggle via props `showAction*`; edit/delete ocultos em soft-deleted; restore visível apenas em soft-deleted
 - Botões topo: Novo, Pesquisar — toggle via `showBtn*`; Export movido para a barra de paginação como DropdownMenu (PDF/Excel)
 - Paginação — exibida somente quando necessário; toggle via `showPagination`; `DataGridPagination` com `hideSizes` e info customizável; contador de registros oculto quando `recordCount === 0`
@@ -663,6 +684,7 @@ server: { host: '0.0.0.0', port: 5173, https: false, allowedHosts: ['.tc.test'] 
 - `record` — registro atual (qualquer módulo)
 - `onGetData()` — coleta dados do formulário externo; retornar `null` aborta o save
 - `onErrors(errors)` — repassa erros 422 ao pai para exibir nos campos
+- `saveDisabled` — boolean externo para desabilitar o botão Salvar (ex: slug inválido, campo obrigatório vazio)
 - `tabs` — array `{label, content}` para modal com abas
 - `children` — campos do módulo (usado quando sem abas)
 
@@ -691,47 +713,62 @@ server: { host: '0.0.0.0', port: 5173, https: false, allowedHosts: ['.tc.test'] 
 
 ---
 
-## Fase 5.3 — Modal CRM de Detalhes (Tenants)
+## Fase 5.3 — Modal CRM de Detalhes
 
-**Componente:** `frontend/src/pages/tenants/tenant-show-modal.tsx` (`TenantShowModal`)
+Padrão de modal CRM adotado para Platforms, Tenants e Pessoas. Aberto quando `mode = 'show'` ou `mode = 'edit'` via dispatcher no modal específico do módulo.
 
-Modal full-width (`max-w-6xl`) estilo CRM para visualização e edição de tenant. Aberto quando `mode = 'show'` ou `mode = 'edit'` via dispatcher no `TenantModal`.
-
-**Dispatcher em `TenantModal`:**
-- `toRenderMode('show')` → `'show-crm'` → abre `TenantShowModal`
-- `toRenderMode('edit')` → `'show-crm'` → abre `TenantShowModal`
+**Dispatcher (padrão em todos os modais CRM):**
+- `toRenderMode('show')` → `'show-crm'` → abre modal CRM
+- `toRenderMode('edit')` → `'show-crm'` → abre modal CRM
 - `toRenderMode('create' | 'delete' | 'restore')` → passa direto para `GenericModal`
 
-**Estrutura do modal:**
-- **Header:** #ID + Nome + Badge Ativo/Inativo
-- **Sub-header:** Criado em / Alterado em / Deletado em (text-xs, abaixo do nome)
-- **Separator**
-- **Coluna esquerda (20%):** Validade (Badge colorido), Slug (Badge), Banco (Badge), Usuário (Badge)
-- **Coluna direita:** Tabs — Visão Geral, Documentos, Endereços, Observação, Arquivos (as 4 últimas: "Em desenvolvimento")
+### TenantShowModal (`tenant-show-modal.tsx`) — max-w-6xl
+
+**Estrutura:**
+- Header: #ID + Nome + Badge Ativo/Inativo + sub-header de timestamps
+- Coluna esquerda (20%): Validade, Slug, Banco, Usuário (Badges)
+- Coluna direita: Tabs — Visão Geral, Documentos, Endereços, Observação, Arquivos
 
 **Tab Visão Geral:**
-- Grid 3 cols editáveis: Nome + Slug (com validação em tempo real) + Validade
-- Separator
-- 3 cards lado a lado (grid-cols-3): **Sandbox** (DatabaseZap) | **Produção** (Server) | **Log** (ScrollText)
-  - Cada card: Banco, Usuário, Senha (com toggle Eye/EyeOff)
-  - Estilo Metronic Billing Details: header `bg-accent/70`, inner `bg-background border border-input`, linhas `flex justify-between`
+- Grid editável: Nome + Slug (validação real-time) + Validade + Platform (select)
+- 3 cards: Sandbox (DatabaseZap) | Produção (Server) | Log (ScrollText) com Banco/Usuário/Senha (Eye/EyeOff)
+- Senhas carregadas sob demanda via `GET /v1/admin/tenants/{id}/credentials`
 
-**Footer:**
-- Esquerda: Switch + Badge Ativo/Inativo (mesmo padrão do `GenericModal`)
-- Direita: Fechar + Salvar
+**TenantsPage — colunas `render`:**
+- `name` → botão clicável abre `TenantShowModal`
+- `platform_id` → `<Badge variant="secondary">` com nome da plataforma
+- `slug`, `db_name` → `<Badge variant="info" appearance="light">`
+- `expiration_date` → Badge colorido (success/warning/destructive) com duração legível
 
-**Comportamento:**
-- Ao salvar: `PUT /v1/admin/tenants/{id}` com `{ name, slug, expiration_date, active }`
-- Slug validation com debounce 500ms: `GET /v1/admin/tenants/check-slug?slug=&exclude_id=`
-- Salvar desabilitado enquanto `slugStatus === 'checking'` ou `'unavailable'`
-- Erros 422 exibidos abaixo dos campos correspondentes
-- **Senhas carregadas sob demanda:** ao clicar no ícone Eye de qualquer schema (sand/prod/log), chama `GET /v1/admin/tenants/{id}/credentials` uma única vez e armazena em estado local; toggle independente por schema (`showSandPass`, `showProdPass`, `showLogPass`)
+### PlatformShowModal (`platform-show-modal.tsx`) — max-w-6xl
 
-**TenantsPage — colunas com `render` customizado:**
-- `name` → botão clicável (bold, azul) que abre `TenantShowModal` via `openModal('show', record)`
-- `slug` → `<Badge variant="info" appearance="light">`
-- `db_name` → `<Badge variant="info" appearance="light">`
-- `expiration_date` → Badge colorido (success/warning/destructive) com duração legível (ex: "28/03/2026 (30 dias)")
+Mesma estrutura do `TenantShowModal`. Aberto quando `mode = 'show'` ou `mode = 'edit'` via `PlatformModal`.
+
+**Tab Visão Geral:**
+- Grid editável: Nome + Domínio + Slug (validação real-time) + Validade
+- 3 cards: Sandbox | Produção | Log com Banco/Usuário/Senha (Eye/EyeOff)
+- Senhas carregadas sob demanda via `GET /v1/admin/platforms/{id}/credentials`
+
+**PlatformsPage — colunas `render`:**
+- `name` → botão clicável abre `PlatformShowModal`
+- `slug`, `db_name` → `<Badge variant="info" appearance="light">`
+- `expiration_date` → Badge colorido com duração legível
+
+### PersonShowModal (`person-show-modal.tsx`) — max-w-4xl
+
+Modal CRM para pessoas. Aberto quando `mode = 'show'` ou `mode = 'edit'` via `PersonModal`.
+
+**Estrutura:**
+- Header: #ID + Nome + Badge Ativo/Inativo + Nascimento (direita)
+- Sub-header de timestamps
+- Tabs: Visão Geral, Documentos, Endereços, Observação, Arquivos (4 últimas: "Em desenvolvimento")
+
+**Tab Visão Geral:**
+- Grid 12 colunas: Nome (span 6) + Data de Nascimento (span 3)
+
+**PessoasPage — filtros extras (aniversário):**
+- `birth_month_day_from`, `birth_month_day_to` — filtro de aniversário por período no ano (MM-DD)
+- Seletor de mês no modal de pesquisa
 
 ---
 

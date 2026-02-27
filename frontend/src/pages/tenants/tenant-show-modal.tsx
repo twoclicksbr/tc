@@ -13,16 +13,23 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { apiGet, apiPut } from '@/lib/api';
 import { type TenantForEdit } from './tenant-modal';
 
+interface Platform {
+  id: number;
+  name: string;
+}
+
 interface TenantShowModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   record: TenantForEdit | null;
+  platforms: Platform[];
   onSuccess: () => void;
 }
 
@@ -46,10 +53,10 @@ function slugify(value: string): string {
 
 function formatDateTimeBR(value?: string | null): string {
   if (!value) return '—';
-  return new Date(value).toLocaleString('pt-BR', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  });
+  const d = new Date(value);
+  const date = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const time = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  return `${date} ${time}`;
 }
 
 function formatId(id: number): string {
@@ -82,28 +89,8 @@ function formatExpiration(v: string | null | undefined): React.ReactNode {
   return <Badge variant={variant} appearance="light">{label}</Badge>;
 }
 
-function InfoField({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-0.5">
-      <p className="text-sm text-muted-foreground">{label}</p>
-      <div className="text-sm font-medium">{children}</div>
-    </div>
-  );
-}
-
-/**
- * ⚠️ LAYOUT APROVADO — Coluna esquerda (35%) está finalizada.
- * Não alterar estrutura, ordem dos campos, espaçamentos ou classes da coluna esquerda
- * sem aprovação explícita.
- *
- * Estrutura aprovada:
- * - #ID + Nome + Badge Ativo/Inativo (mesma linha)
- * - Separator
- * - Grid 2 cols: Slug | Validade
- * - Grid 2 cols: Banco | Usuário
- * - mt-auto: Separator + Grid 2 cols: Criado em | Alterado em
- */
-export function TenantShowModal({ open, onOpenChange, record, onSuccess }: TenantShowModalProps) {
+export function TenantShowModal({ open, onOpenChange, record, platforms, onSuccess }: TenantShowModalProps) {
+  const [platformId, setPlatformId]     = useState<number | null>(null);
   const [name, setName]                 = useState('');
   const [slug, setSlug]                 = useState('');
   const [slugManual, setSlugManual]     = useState(false);
@@ -123,6 +110,7 @@ export function TenantShowModal({ open, onOpenChange, record, onSuccess }: Tenan
   // Reset ao abrir o modal
   useEffect(() => {
     if (open && record) {
+      setPlatformId(record.platform_id ?? null);
       setName(record.name);
       setSlug(record.slug);
       setSlugManual(true);
@@ -196,7 +184,7 @@ export function TenantShowModal({ open, onOpenChange, record, onSuccess }: Tenan
     if (!record) return;
     setSaving(true);
     try {
-      await apiPut(`/v1/admin/tenants/${record.id}`, { name, slug, expiration_date: expirationDate, active });
+      await apiPut(`/v1/admin/tenants/${record.id}`, { platform_id: platformId, name, slug, expiration_date: expirationDate, active });
       onSuccess();
       onOpenChange(false);
     } catch (err: unknown) {
@@ -234,19 +222,25 @@ export function TenantShowModal({ open, onOpenChange, record, onSuccess }: Tenan
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent aria-describedby={undefined} className="max-w-6xl">
         <DialogHeader>
-          <DialogTitle>Detalhes do Tenant</DialogTitle>
+          <DialogTitle>Detalhes da Empresa</DialogTitle>
         </DialogHeader>
 
         <DialogBody className="p-0 flex flex-col flex-1">
 
-          {/* Linha full-width: #ID + Nome + Badge Ativo/Inativo */}
-          <div className="flex items-center gap-2 flex-wrap px-6 py-3">
-            <span className="text-muted-foreground font-normal text-base shrink-0">{formatId(record.id)}</span>
-            <span className="text-xl font-bold leading-tight">{record.name}</span>
-            {record.active
-              ? <Badge variant="success" appearance="light">Ativo</Badge>
-              : <Badge variant="destructive" appearance="light">Inativo</Badge>
-            }
+          {/* #ID + Nome + Badge Ativo/Inativo | Validade (direita) */}
+          <div className="flex items-center justify-between gap-2 px-6 py-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-muted-foreground font-normal text-base shrink-0">{formatId(record.id)}</span>
+              <span className="text-xl font-bold leading-tight truncate">{record.name}</span>
+              {record.active
+                ? <Badge variant="success" appearance="light" className="shrink-0">Ativo</Badge>
+                : <Badge variant="destructive" appearance="light" className="shrink-0">Inativo</Badge>
+              }
+            </div>
+            <div className="shrink-0 flex flex-col items-end gap-0.5">
+              <span className="text-xs text-muted-foreground">Validade</span>
+              {formatExpiration(record.expiration_date)}
+            </div>
           </div>
 
           {/* Datas — abaixo do nome */}
@@ -266,33 +260,10 @@ export function TenantShowModal({ open, onOpenChange, record, onSuccess }: Tenan
 
           <Separator />
 
-          <div className="flex flex-1 min-h-[400px] items-start">
+          <div className="flex flex-1 min-h-[400px]">
 
-            {/* Coluna esquerda */}
-            {/* ⚠️ LAYOUT APROVADO — NÃO ALTERAR esta div (largura, padding, flex, border, self-stretch) sem aprovação explícita */}
-            <div className="w-[20%] shrink-0 border-r border-border px-6 pb-0 pt-3 flex flex-col gap-3 self-stretch">
-
-              {/* Validade / Slug / Banco / Usuário — coluna única */}
-              <InfoField label="Validade">
-                {formatExpiration(record.expiration_date)}
-              </InfoField>
-              <InfoField label="Slug">
-                <Badge appearance="light">{record.slug || '—'}</Badge>
-              </InfoField>
-              <InfoField label="Banco">
-                <Badge appearance="light">{record.db_name || '—'}</Badge>
-              </InfoField>
-              <InfoField label="Usuário">
-                <Badge appearance="light">
-                  <span className="font-mono">{record.sand_user || '—'}</span>
-                </Badge>
-              </InfoField>
-
-
-            </div>
-
-            {/* Coluna direita */}
-            <div className="flex-1 min-w-0 flex flex-col self-stretch">
+            {/* Tabs — largura total */}
+            <div className="w-full flex flex-col">
               <Tabs defaultValue="overview" className="flex flex-col flex-1">
                 <TabsList variant="line" className="px-4 shrink-0">
                   <TabsTrigger value="overview">Visão Geral</TabsTrigger>
@@ -305,8 +276,29 @@ export function TenantShowModal({ open, onOpenChange, record, onSuccess }: Tenan
                 <TabsContent value="overview" className="flex flex-col flex-1 pt-6 px-6 pb-0">
                   <div className="flex flex-col gap-4 flex-1">
 
-                    {/* Nome + Slug + Validade — mesma linha */}
-                    <div className="grid grid-cols-3 gap-4">
+                    {/* Plataforma + Nome + Slug + Validade — mesma linha */}
+                    <div className="grid grid-cols-4 gap-4">
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="show-platform">Plataforma</Label>
+                        <Select
+                          value={platformId ? String(platformId) : 'none'}
+                          onValueChange={(v) => setPlatformId(v === 'none' ? null : Number(v))}
+                        >
+                          <SelectTrigger id="show-platform">
+                            <SelectValue placeholder="Selecione..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Nenhuma</SelectItem>
+                            {platforms.map((p) => (
+                              <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {errors.platform_id && (
+                          <p className="text-sm text-destructive">{errors.platform_id[0]}</p>
+                        )}
+                      </div>
+
                       <div className="flex flex-col gap-1.5">
                         <Label htmlFor="show-name">
                           Nome <span className="text-destructive">*</span>

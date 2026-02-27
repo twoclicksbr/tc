@@ -12,7 +12,7 @@ class MainSeeder extends Seeder
         Module::on('main')->firstOrCreate(
             ['name_url' => 'tenants'],
             [
-                'name'       => 'Tenants',
+                'name'       => 'Empresas',
                 'type'       => 'modulo',
                 'name_table' => 'tenants',
                 'model'      => 'Tenant',
@@ -44,6 +44,19 @@ class MainSeeder extends Seeder
                 'model'      => 'Platform',
                 'request'    => 'PlatformRequest',
                 'order'      => 3,
+                'active'     => true,
+            ]
+        );
+
+        Module::on('main')->firstOrCreate(
+            ['name_url' => 'pessoas'],
+            [
+                'name'       => 'Pessoas',
+                'type'       => 'modulo',
+                'name_table' => 'people',
+                'model'      => 'Person',
+                'request'    => 'PersonRequest',
+                'order'      => 4,
                 'active'     => true,
             ]
         );

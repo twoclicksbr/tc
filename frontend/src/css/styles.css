@@ -29,3 +29,12 @@
 /** Dark/Light Theme Variant **/
 @custom-variant dark (&:is(.dark *));
 @custom-variant light (&:not(.dark *));
+
+/** Date input — reverte display:flex do Tailwind para restaurar layout nativo do browser **/
+/** Com display:flex, o shadow DOM interno perde o posicionamento nativo do ícone do calendário **/
+input[type="date"] {
+  display: block;
+}
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+}

@@ -32,6 +32,7 @@ class TenantRequest extends FormRequest
         $tenantId = $this->route('id');
 
         return [
+            'platform_id'     => ['required', 'exists:main.platforms,id'],
             'name'            => ['required', 'string', 'max:255'],
             'slug'            => ['required', 'string', 'max:255', 'unique:main.tenants,slug' . ($tenantId ? ',' . $tenantId : '')],
             'db_name'         => ['sometimes', 'required', 'string', 'max:255'],

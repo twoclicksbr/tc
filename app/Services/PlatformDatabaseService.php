@@ -2,15 +2,18 @@
 
 namespace App\Services;
 
+use App\Models\Person;
 use App\Models\Platform;
+use App\Models\User;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 
 class PlatformDatabaseService
 {
     public function provision(Platform $platform): void
     {
-        $dbName   = 'tc_' . $platform->db_name;
+        $dbName   = $platform->db_name;
         $sandUser = $platform->sand_user;
         $sandPass = $platform->sand_password; // auto-decryptado pelo cast 'encrypted'
         $prodUser = $platform->prod_user;
@@ -24,19 +27,37 @@ class PlatformDatabaseService
         $logCreated  = false;
 
         try {
-            // 1. Criar banco de dados
-            DB::connection('main')->statement("CREATE DATABASE \"{$dbName}\"");
-            $dbCreated = true;
+            // 1. Criar banco de dados (só se ainda não existir)
+            $dbExists = DB::connection('main')->selectOne("SELECT 1 FROM pg_database WHERE datname = ?", [$dbName]);
+            if (!$dbExists) {
+                DB::connection('main')->statement("CREATE DATABASE \"{$dbName}\"");
+                $dbCreated = true;
+            }
 
-            // 2. Criar 3 users PostgreSQL
-            DB::connection('main')->statement("CREATE USER \"{$sandUser}\" WITH PASSWORD '{$sandPass}'");
-            $sandCreated = true;
+            // 2. Criar 3 users PostgreSQL (ou atualizar senha se já existirem)
+            $sandExists = DB::connection('main')->selectOne("SELECT 1 FROM pg_roles WHERE rolname = ?", [$sandUser]);
+            if (!$sandExists) {
+                DB::connection('main')->statement("CREATE USER \"{$sandUser}\" WITH PASSWORD '{$sandPass}'");
+                $sandCreated = true;
+            } else {
+                DB::connection('main')->statement("ALTER USER \"{$sandUser}\" WITH PASSWORD '{$sandPass}'");
+            }
 
-            DB::connection('main')->statement("CREATE USER \"{$prodUser}\" WITH PASSWORD '{$prodPass}'");
-            $prodCreated = true;
+            $prodExists = DB::connection('main')->selectOne("SELECT 1 FROM pg_roles WHERE rolname = ?", [$prodUser]);
+            if (!$prodExists) {
+                DB::connection('main')->statement("CREATE USER \"{$prodUser}\" WITH PASSWORD '{$prodPass}'");
+                $prodCreated = true;
+            } else {
+                DB::connection('main')->statement("ALTER USER \"{$prodUser}\" WITH PASSWORD '{$prodPass}'");
+            }
 
-            DB::connection('main')->statement("CREATE USER \"{$logUser}\" WITH PASSWORD '{$logPass}'");
-            $logCreated = true;
+            $logExists = DB::connection('main')->selectOne("SELECT 1 FROM pg_roles WHERE rolname = ?", [$logUser]);
+            if (!$logExists) {
+                DB::connection('main')->statement("CREATE USER \"{$logUser}\" WITH PASSWORD '{$logPass}'");
+                $logCreated = true;
+            } else {
+                DB::connection('main')->statement("ALTER USER \"{$logUser}\" WITH PASSWORD '{$logPass}'");
+            }
 
             // 3. Conceder CONNECT no banco para cada user
             DB::connection('main')->statement("GRANT CONNECT ON DATABASE \"{$dbName}\" TO \"{$sandUser}\"");
@@ -56,9 +77,9 @@ class PlatformDatabaseService
             $setup->statement("DROP SCHEMA IF EXISTS public CASCADE");
 
             // b. Criar schemas
-            $setup->statement("CREATE SCHEMA sand");
-            $setup->statement("CREATE SCHEMA prod");
-            $setup->statement("CREATE SCHEMA log");
+            $setup->statement("CREATE SCHEMA IF NOT EXISTS sand");
+            $setup->statement("CREATE SCHEMA IF NOT EXISTS prod");
+            $setup->statement("CREATE SCHEMA IF NOT EXISTS log");
 
             // c. Transferir ownership
             $setup->statement("ALTER SCHEMA sand OWNER TO \"{$sandUser}\"");
@@ -97,6 +118,35 @@ class PlatformDatabaseService
                 '--database' => 'platform_log',
                 '--path'     => 'database/migrations/log',
                 '--force'    => true,
+            ]);
+
+            // 8. Criar person + user admin em sand e prod
+            $today = now()->toDateString();
+
+            $sandPerson = Person::on('platform_sand')->create([
+                'name'       => 'Admin ' . $platform->name,
+                'birth_date' => $today,
+                'order'      => 1,
+                'active'     => true,
+            ]);
+            User::on('platform_sand')->create([
+                'person_id' => $sandPerson->id,
+                'email'     => 'sand@' . $platform->domain,
+                'password'  => Hash::make('@sand_' . $platform->slug . '_999'),
+                'active'    => true,
+            ]);
+
+            $prodPerson = Person::on('platform_prod')->create([
+                'name'       => 'Admin ' . $platform->name,
+                'birth_date' => $today,
+                'order'      => 1,
+                'active'     => true,
+            ]);
+            User::on('platform_prod')->create([
+                'person_id' => $prodPerson->id,
+                'email'     => 'prod@' . $platform->domain,
+                'password'  => Hash::make('@prod_' . $platform->slug . '_999'),
+                'active'    => true,
             ]);
 
         } catch (\Throwable $e) {

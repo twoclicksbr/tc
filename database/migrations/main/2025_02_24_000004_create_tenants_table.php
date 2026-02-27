@@ -10,6 +10,7 @@ return new class extends Migration
     {
         Schema::create('tenants', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('platform_id')->constrained('platforms')->cascadeOnDelete();
             $table->string('name');
             $table->string('slug')->unique();
             $table->string('db_name');

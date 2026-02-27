@@ -64,6 +64,9 @@ export interface GenericModalProps {
   btnDelete?: boolean;
   showSwitch?: boolean;
 
+  // Desabilita botão Salvar externamente (ex: slug sendo verificado)
+  saveDisabled?: boolean;
+
   // Labels dos botões
   labelCancel?: string;
   labelSave?: string;
@@ -112,10 +115,11 @@ export function GenericModal({
   onSuccess,
   onGetData,
   onErrors,
-  btnCancel  = true,
-  btnSave    = true,
-  btnDelete  = true,
-  showSwitch = true,
+  btnCancel    = true,
+  btnSave      = true,
+  btnDelete    = true,
+  showSwitch   = true,
+  saveDisabled = false,
   labelCancel = 'Cancelar',
   labelSave   = 'Salvar',
   labelDelete = 'Deletar',
@@ -329,7 +333,7 @@ export function GenericModal({
               <Button
                 size="sm"
                 onClick={handleSave}
-                disabled={saving}
+                disabled={saving || saveDisabled}
               >
                 {saving ? 'Salvando...' : labelSave}
               </Button>

@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react';
-import { ChevronDown, Menu } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
-import { MENU_ROOT } from '@/config/menu.config';
+import { ChevronDown, Globe, Menu } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { getTenantSlug, getUrlTenantSlug } from '@/lib/tenant';
 import { toAbsoluteUrl } from '@/lib/helpers';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -19,18 +18,14 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 import { SidebarMenu } from './sidebar-menu';
+import { usePlatform } from '@/providers/platform-provider';
 
 export function HeaderLogo() {
-  const { pathname } = useLocation();
-  const [selectedMenuItem, setSelectedMenuItem] = useState(MENU_ROOT[1]);
+  const isAdmin = getUrlTenantSlug() === 'admin';
 
-  useEffect(() => {
-    MENU_ROOT.forEach((item) => {
-      if (item.rootPath && pathname.includes(item.rootPath)) {
-        setSelectedMenuItem(item);
-      }
-    });
-  }, [pathname]);
+  const { platforms, selectedPlatform, selectPlatform } = usePlatform();
+
+  const triggerLabel = selectedPlatform ? selectedPlatform.name : 'Principal';
 
   return (
     <div className="flex items-center gap-2.5">
@@ -56,7 +51,7 @@ export function HeaderLogo() {
 
         <Link to="/" className="mx-1">
           <img
-            src={toAbsoluteUrl('/media/logos/ICO-Dark.svg')}
+            src={toAbsoluteUrl('/media/logos/favicon-tc-dark.svg')}
             className="min-h-6"
             alt="logo"
           />
@@ -69,31 +64,42 @@ export function HeaderLogo() {
           TwoClicks
         </h3>
 
-        {/* Account dropdown */}
+        {/* Platform selector */}
         <div className="hidden md:flex items-center gap-1.5">
-          <span className="text-sm text-muted-foreground font-medium">
-            /
-          </span>
-          <DropdownMenu>
-            <DropdownMenuTrigger className="cursor-pointer text-mono font-medium flex items-center gap-2">
-              {selectedMenuItem.title}
-              <ChevronDown className="size-3.5! text-muted-foreground" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent sideOffset={10} side="bottom" align="start">
-              {MENU_ROOT.map((item, index) => (
+          <span className="text-sm text-muted-foreground font-medium">/</span>
+
+          {isAdmin ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger className="cursor-pointer text-mono font-medium flex items-center gap-2">
+                {triggerLabel}
+                <ChevronDown className="size-3.5! text-muted-foreground" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent sideOffset={10} side="bottom" align="start">
                 <DropdownMenuItem
-                  key={index}
-                  asChild
-                  className={cn(item === selectedMenuItem && 'bg-accent')}
+                  className={cn(selectedPlatform === null && 'bg-accent')}
+                  onSelect={() => selectPlatform(null)}
                 >
-                  <Link to={item.path || ''}>
-                    {item.icon && <item.icon />}
-                    {item.title}
-                  </Link>
+                  <Globe className="size-4 opacity-60" />
+                  Principal
                 </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                {platforms.map((p) => (
+                  <DropdownMenuItem
+                    key={p.id}
+                    className={cn(selectedPlatform?.id === p.id && 'bg-accent')}
+                    onSelect={() => selectPlatform(p)}
+                  >
+                    <Globe className="size-4 opacity-60" />
+                    {p.name}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <span className="text-mono font-medium flex items-center gap-1.5">
+              <Globe className="size-3.5 opacity-60" />
+              {getTenantSlug()}
+            </span>
+          )}
         </div>
       </div>
     </div>
