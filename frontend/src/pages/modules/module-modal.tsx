@@ -32,6 +32,12 @@ export interface ModuleForEdit {
   after_store: 'index' | 'show' | 'create' | 'edit' | null;
   after_update: 'index' | 'show' | 'create' | 'edit' | null;
   after_restore: 'index' | 'show' | 'create' | 'edit' | null;
+  screen_index: string | null;
+  screen_show: string | null;
+  screen_create: string | null;
+  screen_edit: string | null;
+  screen_delete: string | null;
+  screen_restore: string | null;
   order: number;
   active: boolean;
   created_at: string;

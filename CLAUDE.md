@@ -518,7 +518,7 @@ O arquivo contém as rotas do Metronic boilerplate (account, network, store, pub
 | `/dashboard` | `DashboardPage` | Dashboard geral (placeholder) |
 | `/platforms` | `PlatformsPage` | Grid de platforms — CRUD completo via modal ✅ + filtro de Validade ✅ + modal CRM (`PlatformShowModal`, max-w-6xl) ✅ — **só acessível no tenant `admin`** |
 | `/tenants` | `TenantsPage` | Grid de tenants — CRUD completo via modal ✅ + filtro de Validade ✅ + modal CRM (`TenantShowModal`, max-w-6xl) ✅ — **só acessível no tenant `admin`** |
-| `/modules` | `ModulesPage` | Gestão de módulos ✅ — GenericGrid agrupado por owner_level (moduleId=2) + ModuleModal (create/delete/restore) + ModuleShowModal (show/edit, inline na página com "← Voltar") — colunas: name, slug, type, owner_level |
+| `/modules` | `ModulesPage` | Gestão de módulos ✅ — GenericGrid agrupado em 2 níveis (owner_level + type) com DnD por grupo (moduleId=2) + ModuleModal (create/delete/restore) + ModuleShowModal (show/edit, inline na página com breadcrumb "← Voltar") — colunas: name, slug, order + filtros: Proprietário, Tipo |
 | `/pessoas` | `PessoasPage` | Cadastro de pessoas ✅ — GenericGrid com filtro de aniversário + PersonModal (create/delete/restore) + PersonShowModal (show/edit, CRM max-w-4xl) |
 | `/produtos` | `ProdutosPage` | Produtos (placeholder) |
 | `/compras` | `ComprasPage` | Compras (placeholder) |
@@ -631,7 +631,9 @@ server: { host: '0.0.0.0', port: 5173, https: false, allowedHosts: ['.tc.test', 
 - Btn pesquisar — abre `Dialog` de pesquisa (implementado) ✅; calendar com locale `ptBR`
 - Empty state — exibe ícone `SearchX` + mensagem "Nenhum registro encontrado"
 - `fetchData` usa `URLSearchParams` — inclui `activeFilters` spread nos params da query
-- **Agrupamento:** props `groupBy` (campo), `groupByLabels` (mapa key→label), `groupByOrder` (ordem dos grupos) — quando definido, renderiza `GroupedTable` (sem DnD) com cabeçalhos separadores entre grupos
+- **Agrupamento simples:** props `groupBy` (campo), `groupByLabels` (mapa key→label), `groupByOrder` (ordem dos grupos) — quando definido, renderiza `GroupedTable` com cabeçalhos separadores entre grupos
+- **Agrupamento duplo:** props `groupByCompute` (função `(record) => string` que calcula chave composta `"level1|level2"`) + `groupByLevel1Labels` (mapa key→label do nível 1) — renderiza dois níveis de cabeçalhos: nível 1 (bold, fundo escuro) e nível 2 (semibold, fundo muted) — ex: `owner_level|type`
+- **DnD em grupos agrupados:** quando `showDrag=true` + `groupBy` definido, usa `GroupedDndSection` (DndContext por grupo) e `handleGroupedDragEnd` para reordenar dentro de cada grupo separadamente
 
 **Props de pesquisa (`GenericGridProps`):**
 - `renderSearchFilters` — `ReactNode` com filtros específicos do módulo (linha 2 do modal)
@@ -657,8 +659,12 @@ server: { host: '0.0.0.0', port: 5173, https: false, allowedHosts: ['.tc.test', 
   &search_id=42&search_name=teste&search_type=contains
   &date_type=created_at&date_from=2025-01-01&date_to=2025-12-31
   &active=true&include_deleted=true
-  &[extras do módulo — ex: expiration_date_from=2025-01-01&expiration_date_to=2025-12-31]
+  &[extras do módulo — ex: expiration_date_from=..., type=module, owner_level=master]
 ```
+
+**Filtros extras suportados pelo `ModuleController.index`:**
+- `type` — filtra por enum `module/submodule/pivot` (verificado via `in_array($fillable)`)
+- `owner_level` — filtra por enum `master/platform/tenant` (verificado via `in_array($fillable)`)
 
 **Drag & drop (implementado com `@dnd-kit`):**
 - Componente `DragHandle` usa `useSortable` do `@dnd-kit/sortable`; tooltip "Arrastar para reordenar" some durante o drag (`isDragging ? false : undefined`)
@@ -791,9 +797,10 @@ Modal CRM para módulos. Suporta dois modos de renderização:
 **Props adicionais:**
 - `inline?: boolean` — renderiza sem Dialog, integrado à página
 - `onBack?: () => void` — callback do botão "← Voltar" (inline mode)
+- `moduleId?: number` — ID do módulo pai; usado no modo inline para buscar nome/ícone do módulo pai e exibir no breadcrumb
 
 **Estrutura (ambos os modos):**
-- **Linha 1 (inline):** `← Voltar` (botão ghost) + #ID + Nome + Badge Ativo/Inativo + badges Tipo/Proprietário (direita)
+- **Linha 1 (inline):** `← Voltar` + breadcrumb `[ícone] Módulos > ` + #ID + Nome + Badge Ativo/Inativo + badges Tipo/Proprietário (direita)
 - **Linha 1 (dialog):** #ID + Nome + Badge Ativo/Inativo + badges Tipo/Proprietário (direita)
 - **Linha 2:** Timestamps (Criado em / Alterado em / Deletado em)
 - **Tabs:** Dados ✅, Campos ✅, Grid, Form, Restrições, Seeds (últimas 4: "Em desenvolvimento")
@@ -801,8 +808,11 @@ Modal CRM para módulos. Suporta dois modos de renderização:
 **Tab Dados — 4 cards:**
 - **Identificação:** Ícone (span 1, botão abre `IconPickerModal`) + Nome (span 5) + Tipo (span 2) + Proprietário (span 2) + Tamanho Modal (span 2)
 - **Configuração:** Slug (span 2, validação real-time) + Prefixo URL (span 4, com preview `/{slug}`) + Model (span 2, select scan-files) + Request (span 2, select scan-files) + Controller (span 2, select scan-files agrupado por pasta)
-- **Ações de Comportamento (col-4) + Submódulos (col-8):** Selects Após Criar/Editar/Restaurar | checkboxes de submódulos disponíveis (visível apenas quando type=module; busca `GET /v1/{tenant}/modules?search_type=submodule`)
-- **Descrições:** 6 Textareas 3×2 (index, show, store, update, delete, restore)
+- **Linha 3 (3 cards lado a lado):**
+  - **Tela de Exibição (col-4):** 6 Selects em grid 2×3 (Index/Visualizar | Criar/Editar | Deletar/Restaurar) — opções: `none` (Nenhum), `page` (Tela), `modal` (Modal), `card` (Card); campos: `screen_index`, `screen_show`, `screen_create`, `screen_edit`, `screen_delete`, `screen_restore` — apenas visual no frontend por enquanto (backend ainda não tem essas colunas)
+  - **Ações de Comportamento (col-2):** Selects Após Criar/Editar/Restaurar
+  - **Submódulos (col-6):** checkboxes de submódulos disponíveis (visível apenas quando type=module; busca `GET /v1/{tenant}/modules?type=submodule`)
+- **Descrições:** 6 Textareas 3×2 (index, show, store, update, delete, restore) — **card colapsável**; começa fechado (default); abre automaticamente se o record tiver algum campo de descrição preenchido; botão toggle com ChevronDown/ChevronRight
 
 **Tab Campos:** componente `ModuleFieldsTab` — CRUD inline de campos com drag-and-drop (@dnd-kit), formulário expansível por linha
 
@@ -817,15 +827,23 @@ Modal CRM para módulos. Suporta dois modos de renderização:
 
 **ModulesPage — renderização inline:**
 - `selectedModule: ModuleForEdit | null` state
-- Quando `selectedModule !== null`: renderiza título `🔲 Módulos` + `ModuleShowModal inline`
+- Quando `selectedModule !== null`: renderiza `ModuleShowModal inline` diretamente (sem título da página — o breadcrumb inline já exibe "← Voltar [ícone] Módulos > #ID Nome")
 - Quando `null`: renderiza `ModuleInlineCtx.Provider` + `GenericGrid` (com `key={gridKey}` para forçar refresh)
 - `handleSuccess()`: limpa `selectedModule` + incrementa `gridKey`
+
+**ModulesPage — agrupamento duplo:**
+- `groupByCompute={(record) => \`${record.owner_level}|${record.type}\`}` — chave composta
+- `groupByLevel1Labels={{ master: 'MASTER', platform: 'PLATFORM', tenant: 'TENANT' }}`
+- `groupByLabels={{ module: 'Módulo', submodule: 'Submódulo', pivot: 'Pivot' }}`
+- `groupByOrder`: 9 combinações na ordem master→platform→tenant, dentro de cada um module→submodule→pivot
+- DnD dentro de grupos habilitado (`showDrag=true`)
+- Filtros de pesquisa específicos: Proprietário (owner_level) e Tipo (type) via `renderSearchFilters`
 
 **ModulesPage — colunas `render`:**
 - `name` → botão clicável dispara inline via context
 - `slug` → `<Badge variant="info" appearance="light">`
-- `type` → Badge (module=primary, submodule=secondary, pivot=warning)
-- `owner_level` → Badge (master=primary, platform=secondary, tenant=outline)
+- `order` → `<Badge variant="info" appearance="light">`
+- `type` e `owner_level` — removidas do grid (agrupamento duplo já comunica essa informação)
 
 ### PersonShowModal (`person-show-modal.tsx`) — max-w-4xl
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronRight } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { IconPickerModal } from '@/components/icon-picker-modal';
 import { Badge } from '@/components/ui/badge';
@@ -33,6 +33,7 @@ interface ModuleShowModalProps {
   onSuccess: () => void;
   inline?: boolean;
   onBack?: () => void;
+  moduleId?: number;
 }
 
 type SlugStatus = 'idle' | 'checking' | 'available' | 'unavailable';
@@ -72,7 +73,7 @@ const OWNER_LABELS: Record<string, { label: string; variant: 'primary' | 'second
   tenant:   { label: 'Tenant',     variant: 'outline' },
 };
 
-export function ModuleShowModal({ open, onOpenChange, record, onSuccess, inline = false, onBack }: ModuleShowModalProps) {
+export function ModuleShowModal({ open, onOpenChange, record, onSuccess, inline = false, onBack, moduleId }: ModuleShowModalProps) {
   const [name, setName]               = useState('');
   const [slug, setSlug]               = useState('');
   const [slugManual, setSlugManual]   = useState(false);
@@ -88,12 +89,19 @@ export function ModuleShowModal({ open, onOpenChange, record, onSuccess, inline 
   const [afterUpdate, setAfterUpdate] = useState('');
   const [urlPrefix, setUrlPrefix]       = useState('');
   const [afterRestore, setAfterRestore] = useState('');
+  const [screenIndex, setScreenIndex]     = useState('none');
+  const [screenCreate, setScreenCreate]   = useState('none');
+  const [screenEdit, setScreenEdit]       = useState('none');
+  const [screenDelete, setScreenDelete]   = useState('none');
+  const [screenRestore, setScreenRestore] = useState('none');
+  const [screenShow, setScreenShow]       = useState('none');
   const [descIndex, setDescIndex]     = useState('');
   const [descShow, setDescShow]       = useState('');
   const [descStore, setDescStore]     = useState('');
   const [descUpdate, setDescUpdate]   = useState('');
   const [descDelete, setDescDelete]   = useState('');
   const [descRestore, setDescRestore] = useState('');
+  const [descriptionsOpen, setDescriptionsOpen] = useState(false);
   const [active, setActive]             = useState(true);
   const [saving, setSaving]             = useState(false);
   const [errors, setErrors]             = useState<FieldErrors>({});
@@ -101,6 +109,7 @@ export function ModuleShowModal({ open, onOpenChange, record, onSuccess, inline 
   const [scanFiles, setScanFiles]       = useState<ScanFiles>({ models: [], requests: [], controllers: {} });
   const [activeTab, setActiveTab]       = useState('dados');
   const [submodules, setSubmodules]     = useState<Array<{ id: number; name: string; icon: string | null }>>([]);
+  const [parentModule, setParentModule] = useState<{ name: string; icon: string | null } | null>(null);
 
   useEffect(() => {
     if ((open || inline) && record) {
@@ -118,12 +127,22 @@ export function ModuleShowModal({ open, onOpenChange, record, onSuccess, inline 
       setAfterStore(record.after_store ?? '');
       setAfterUpdate(record.after_update ?? '');
       setAfterRestore(record.after_restore ?? '');
+      setScreenIndex(record.screen_index ?? 'none');
+      setScreenCreate(record.screen_create ?? 'none');
+      setScreenEdit(record.screen_edit ?? 'none');
+      setScreenDelete(record.screen_delete ?? 'none');
+      setScreenRestore(record.screen_restore ?? 'none');
+      setScreenShow(record.screen_show ?? 'none');
       setDescIndex(record.description_index ?? '');
       setDescShow(record.description_show ?? '');
       setDescStore(record.description_store ?? '');
       setDescUpdate(record.description_update ?? '');
       setDescDelete(record.description_delete ?? '');
       setDescRestore(record.description_restore ?? '');
+      setDescriptionsOpen(
+        !!(record.description_index || record.description_show || record.description_store ||
+           record.description_update || record.description_delete || record.description_restore)
+      );
       setActive(record.active ?? true);
       setErrors({});
       setSlugStatus('idle');
@@ -131,6 +150,14 @@ export function ModuleShowModal({ open, onOpenChange, record, onSuccess, inline 
       setActiveTab('dados');
     }
   }, [open, inline, record]);
+
+  // Busca moduleConfig do pai para breadcrumb (apenas no modo inline)
+  useEffect(() => {
+    if (!inline || !moduleId) return;
+    apiGet<{ name: string; icon: string | null }>(`/v1/${getTenantSlug()}/modules/${moduleId}`)
+      .then((res) => setParentModule({ name: res.name, icon: res.icon }))
+      .catch(() => {});
+  }, [inline, moduleId]);
 
   // Scan de Models e Requests disponíveis
   useEffect(() => {
@@ -144,7 +171,7 @@ export function ModuleShowModal({ open, onOpenChange, record, onSuccess, inline 
   useEffect(() => {
     if ((!open && !inline) || type !== 'module') { setSubmodules([]); return; }
     apiGet<{ data: Array<{ id: number; name: string; icon: string | null }> }>(
-      `/v1/${getTenantSlug()}/modules?search_type=submodule&per_page=100&active=true`,
+      `/v1/${getTenantSlug()}/modules?type=submodule&per_page=100&active=true&sort=order&direction=desc`,
     )
       .then((res) => setSubmodules(res.data))
       .catch(() => {});
@@ -217,6 +244,12 @@ export function ModuleShowModal({ open, onOpenChange, record, onSuccess, inline 
         description_update: descUpdate || null,
         description_delete: descDelete || null,
         description_restore: descRestore || null,
+        screen_index: screenIndex,
+        screen_show: screenShow,
+        screen_create: screenCreate,
+        screen_edit: screenEdit,
+        screen_delete: screenDelete,
+        screen_restore: screenRestore,
         active,
       });
       onSuccess();
@@ -402,11 +435,101 @@ export function ModuleShowModal({ open, onOpenChange, record, onSuccess, inline 
         </div>
       </div>
 
-      {/* Linha 3: Após Criar/Editar/Restaurar (col-4) + Card Submódulos (col-8) */}
+      {/* Linha 3: Ações de Comportamento (col-3) + Tela de Exibição (col-3) + Submódulos (col-6) */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '1rem', alignItems: 'stretch' }}>
 
-        {/* Coluna esquerda: card Ações de Comportamento */}
+        {/* Card Tela de Exibição */}
         <div style={{ gridColumn: 'span 4' }} data-slot="card" className="items-stretch text-card-foreground border border-border bg-accent/70 rounded-md shadow-none flex flex-col">
+          <div data-slot="card-content" className="grow p-0 flex flex-col min-h-0">
+            <h3 className="text-sm font-medium text-foreground py-2.5 ps-2 shrink-0">Tela de Exibição</h3>
+            <div className="bg-background rounded-md m-1 mt-0 border border-input py-3 px-3.5 space-y-3 flex-1">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="mod-screen-index">Index</Label>
+                  <Select value={screenIndex} onValueChange={setScreenIndex}>
+                    <SelectTrigger id="mod-screen-index"><SelectValue placeholder="—" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Nenhum</SelectItem>
+                      <SelectItem value="page">Tela</SelectItem>
+                      <SelectItem value="modal">Modal</SelectItem>
+                      <SelectItem value="card">Card</SelectItem>
+                      {/* <SelectItem value="card">Card</SelectItem> */}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="mod-screen-show">Visualizar</Label>
+                  <Select value={screenShow} onValueChange={setScreenShow}>
+                    <SelectTrigger id="mod-screen-show"><SelectValue placeholder="—" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Nenhum</SelectItem>
+                      <SelectItem value="page">Tela</SelectItem>
+                      <SelectItem value="modal">Modal</SelectItem>
+                      <SelectItem value="card">Card</SelectItem>
+                      {/* <SelectItem value="card">Card</SelectItem> */}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="mod-screen-create">Criar</Label>
+                  <Select value={screenCreate} onValueChange={setScreenCreate}>
+                    <SelectTrigger id="mod-screen-create"><SelectValue placeholder="—" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Nenhum</SelectItem>
+                      <SelectItem value="page">Tela</SelectItem>
+                      <SelectItem value="modal">Modal</SelectItem>
+                      <SelectItem value="card">Card</SelectItem>
+                      {/* <SelectItem value="card">Card</SelectItem> */}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="mod-screen-edit">Editar</Label>
+                  <Select value={screenEdit} onValueChange={setScreenEdit}>
+                    <SelectTrigger id="mod-screen-edit"><SelectValue placeholder="—" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Nenhum</SelectItem>
+                      <SelectItem value="page">Tela</SelectItem>
+                      <SelectItem value="modal">Modal</SelectItem>
+                      <SelectItem value="card">Card</SelectItem>
+                      {/* <SelectItem value="card">Card</SelectItem> */}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="mod-screen-delete">Deletar</Label>
+                  <Select value={screenDelete} onValueChange={setScreenDelete}>
+                    <SelectTrigger id="mod-screen-delete"><SelectValue placeholder="—" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Nenhum</SelectItem>
+                      <SelectItem value="page">Tela</SelectItem>
+                      <SelectItem value="modal">Modal</SelectItem>
+                      <SelectItem value="card">Card</SelectItem>
+                      {/* <SelectItem value="card">Card</SelectItem> */}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="mod-screen-restore">Restaurar</Label>
+                  <Select value={screenRestore} onValueChange={setScreenRestore}>
+                    <SelectTrigger id="mod-screen-restore"><SelectValue placeholder="—" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Nenhum</SelectItem>
+                      <SelectItem value="page">Tela</SelectItem>
+                      <SelectItem value="modal">Modal</SelectItem>
+                      <SelectItem value="card">Card</SelectItem>
+                      {/* <SelectItem value="card">Card</SelectItem> */}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Card Ações de Comportamento */}
+        <div style={{ gridColumn: 'span 2' }} data-slot="card" className="items-stretch text-card-foreground border border-border bg-accent/70 rounded-md shadow-none flex flex-col">
           <div data-slot="card-content" className="grow p-0 flex flex-col min-h-0">
             <h3 className="text-sm font-medium text-foreground py-2.5 ps-2 shrink-0">Ações de Comportamento</h3>
             <div className="bg-background rounded-md m-1 mt-0 border border-input py-3 px-3.5 space-y-3 flex-1">
@@ -449,9 +572,10 @@ export function ModuleShowModal({ open, onOpenChange, record, onSuccess, inline 
           </div>
         </div>
 
-        {/* Coluna direita: Card Submódulos — visível apenas quando type=module */}
+
+        {/* Card Submódulos — visível apenas quando type=module */}
         {type === 'module' ? (
-          <div style={{ gridColumn: 'span 8' }} data-slot="card" className="items-stretch text-card-foreground border border-border bg-accent/70 rounded-md shadow-none flex flex-col">
+          <div style={{ gridColumn: 'span 6' }} data-slot="card" className="items-stretch text-card-foreground border border-border bg-accent/70 rounded-md shadow-none flex flex-col">
             <div data-slot="card-content" className="grow p-0 flex flex-col min-h-0">
               <h3 className="text-sm font-medium text-foreground py-2.5 ps-2 shrink-0">Submódulos</h3>
               <div className="bg-background rounded-md m-1 mt-0 border border-input py-3 px-3.5 overflow-y-auto flex-1">
@@ -477,15 +601,25 @@ export function ModuleShowModal({ open, onOpenChange, record, onSuccess, inline 
             </div>
           </div>
         ) : (
-          <div style={{ gridColumn: 'span 8' }} />
+          <div style={{ gridColumn: 'span 6' }} />
         )}
       </div>
 
       {/* Card Descrições */}
       <div data-slot="card" className="items-stretch text-card-foreground border border-border bg-accent/70 rounded-md shadow-none flex flex-col">
         <div data-slot="card-content" className="grow p-0 flex flex-col">
-          <h3 className="text-sm font-medium text-foreground py-2.5 ps-2">Descrições</h3>
-          <div className="bg-background rounded-md m-1 mt-0 border border-input py-3 px-3.5">
+          <button
+            type="button"
+            className="flex items-center gap-1.5 py-2.5 ps-2 text-sm font-medium text-foreground hover:text-foreground/80 text-left"
+            onClick={() => setDescriptionsOpen((v) => !v)}
+          >
+            {descriptionsOpen
+              ? <ChevronDown className="size-4 text-muted-foreground shrink-0" />
+              : <ChevronRight className="size-4 text-muted-foreground shrink-0" />
+            }
+            Descrições
+          </button>
+          {descriptionsOpen && <div className="bg-background rounded-md m-1 mt-0 border border-input py-3 px-3.5">
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="mod-show-desc-index">Descrição Index</Label>
@@ -542,7 +676,7 @@ export function ModuleShowModal({ open, onOpenChange, record, onSuccess, inline 
                 />
               </div>
             </div>
-          </div>
+          </div>}
         </div>
       </div>
 
@@ -615,6 +749,20 @@ export function ModuleShowModal({ open, onOpenChange, record, onSuccess, inline 
               <ArrowLeft className="size-4" />
               Voltar
             </Button>
+            {parentModule && (() => {
+              const ParentIcon = parentModule.icon
+                ? ((LucideIcons as Record<string, unknown>)[parentModule.icon] as React.ComponentType<{ className?: string }> | undefined)
+                : undefined;
+              return (
+                <>
+                  <span className="flex items-center gap-1.5 text-muted-foreground shrink-0">
+                    {ParentIcon && <ParentIcon className="size-4" />}
+                    <span className="text-base">{parentModule.name}</span>
+                  </span>
+                  <ChevronRight className="size-4 text-muted-foreground shrink-0" />
+                </>
+              );
+            })()}
             <span className="text-muted-foreground font-normal text-base shrink-0">{formatId(record.id)}</span>
             <span className="text-xl font-bold leading-tight truncate">{record.name}</span>
             {record.active
@@ -678,6 +826,7 @@ export function ModuleShowModal({ open, onOpenChange, record, onSuccess, inline 
         <div className="flex flex-row sm:justify-between items-center border-t px-4 py-3 shrink-0">
           {footerLeft}
           <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={onBack}>Cancelar</Button>
             {saveButton}
           </div>
         </div>
@@ -772,7 +921,7 @@ export function ModuleShowModal({ open, onOpenChange, record, onSuccess, inline 
           {footerLeft}
           <div className="flex items-center gap-2">
             <DialogClose asChild>
-              <Button variant="outline" size="sm">Fechar</Button>
+              <Button variant="outline" size="sm">Cancelar</Button>
             </DialogClose>
             {saveButton}
           </div>

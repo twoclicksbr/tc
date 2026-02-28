@@ -1,4 +1,4 @@
-import React, { Fragment, type ComponentType, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { CSSProperties, Fragment, type ComponentType, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   type Cell,
   type Column,
@@ -12,8 +12,22 @@ import {
   type SortingState,
   useReactTable,
 } from '@tanstack/react-table';
-import { type DragEndEvent, type UniqueIdentifier } from '@dnd-kit/core';
-import { arrayMove, useSortable } from '@dnd-kit/sortable';
+import {
+  closestCenter,
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  MouseSensor,
+  TouchSensor,
+  type DragEndEvent,
+  type DragStartEvent,
+  type UniqueIdentifier,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
+import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import {
   ArrowDown,
   ArrowUp,
@@ -144,6 +158,8 @@ export interface GenericGridProps {
   groupBy?: string;
   groupByLabels?: Record<string, string>;
   groupByOrder?: string[];
+  groupByCompute?: (record: Record<string, unknown>) => string;
+  groupByLevel1Labels?: Record<string, string>;
 }
 
 // ---------------------------------------------------------------------------
@@ -302,6 +318,85 @@ function renderCellByType(value: unknown, col: ColumnConfig, record: AnyRecord, 
 }
 
 // ---------------------------------------------------------------------------
+// Grouped table DnD helpers
+// ---------------------------------------------------------------------------
+
+function GroupedDndRow({ row }: { row: Row<AnyRecord> }) {
+  const { transform, setNodeRef, isDragging } = useSortable({ id: row.id });
+  const style: CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    opacity: isDragging ? 0 : 1,
+    position: 'relative',
+  };
+  return (
+    <DataGridTableBodyRow row={row} dndRef={setNodeRef} dndStyle={style}>
+      {row.getVisibleCells().map((cell: Cell<AnyRecord, unknown>, colIndex) => (
+        <DataGridTableBodyRowCell cell={cell} key={colIndex}>
+          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+        </DataGridTableBodyRowCell>
+      ))}
+    </DataGridTableBodyRow>
+  );
+}
+
+function GroupedDndSection({
+  rows,
+  onDragEnd,
+  renderDragOverlay,
+}: {
+  rows: Row<AnyRecord>[];
+  onDragEnd: (activeId: string, overId: string) => void;
+  renderDragOverlay?: (activeId: UniqueIdentifier | null) => React.ReactNode;
+}) {
+  const id = useId();
+  const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
+  const rowIds = useMemo(() => rows.map((r) => r.id), [rows]);
+  const sensors = useSensors(
+    useSensor(MouseSensor),
+    useSensor(TouchSensor),
+    useSensor(KeyboardSensor),
+  );
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    setActiveId(event.active.id);
+  }, []);
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      setActiveId(null);
+      if (over && active.id !== over.id) {
+        onDragEnd(String(active.id), String(over.id));
+      }
+      (document.activeElement as HTMLElement)?.blur();
+    },
+    [onDragEnd],
+  );
+  const handleDragCancel = useCallback(() => {
+    setActiveId(null);
+    (document.activeElement as HTMLElement)?.blur();
+  }, []);
+  return (
+    <DndContext
+      id={id}
+      collisionDetection={closestCenter}
+      modifiers={[restrictToVerticalAxis]}
+      sensors={sensors}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
+    >
+      <SortableContext items={rowIds} strategy={verticalListSortingStrategy}>
+        {rows.map((row) => (
+          <GroupedDndRow row={row} key={row.id} />
+        ))}
+      </SortableContext>
+      <DragOverlay dropAnimation={null}>
+        {renderDragOverlay ? renderDragOverlay(activeId) : null}
+      </DragOverlay>
+    </DndContext>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Grouped table (static, sem DnD) — renderizado quando groupBy está definido
 // ---------------------------------------------------------------------------
 
@@ -309,10 +404,20 @@ function GroupedTable({
   groupBy,
   groupByLabels,
   groupByOrder,
+  groupByCompute,
+  groupByLevel1Labels,
+  showDrag,
+  onGroupedDragEnd,
+  renderDragOverlay,
 }: {
   groupBy: string;
   groupByLabels: Record<string, string>;
   groupByOrder?: string[];
+  groupByCompute?: (record: Record<string, unknown>) => string;
+  groupByLevel1Labels?: Record<string, string>;
+  showDrag?: boolean;
+  onGroupedDragEnd?: (activeId: string, overId: string) => void;
+  renderDragOverlay?: (activeId: UniqueIdentifier | null) => React.ReactNode;
 }) {
   const { table, isLoading, props } = useDataGrid();
   const pagination = table.getState().pagination;
@@ -322,7 +427,9 @@ function GroupedTable({
   const groups = useMemo(() => {
     const map = new Map<string, Row<AnyRecord>[]>();
     for (const row of rows) {
-      const key = String((row.original as AnyRecord)[groupBy] ?? '');
+      const key = groupByCompute
+        ? groupByCompute(row.original as AnyRecord)
+        : String((row.original as AnyRecord)[groupBy] ?? '');
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(row);
     }
@@ -332,7 +439,7 @@ function GroupedTable({
       .filter((k) => !order.includes(k))
       .map((k) => ({ key: k, rows: map.get(k)! }));
     return [...sorted, ...extra];
-  }, [rows, groupBy, groupByOrder]);
+  }, [rows, groupBy, groupByOrder, groupByCompute]);
 
   return (
     <DataGridTableBase>
@@ -362,27 +469,49 @@ function GroupedTable({
             </DataGridTableBodyRowSkeleton>
           ))
         ) : rows.length ? (
-          groups.map(({ key, rows: groupRows }) => (
-            <Fragment key={`group-${key}`}>
-              <tr>
-                <td
-                  colSpan={totalCols}
-                  className="bg-muted/60 px-4 py-1.5 font-semibold text-xs text-muted-foreground uppercase tracking-wide border-y border-border"
-                >
-                  {groupByLabels[key] ?? key}
-                </td>
-              </tr>
-              {groupRows.map((row) => (
-                <DataGridTableBodyRow row={row} key={row.id}>
-                  {row.getVisibleCells().map((cell: Cell<AnyRecord, unknown>, colIndex) => (
-                    <DataGridTableBodyRowCell cell={cell} key={colIndex}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </DataGridTableBodyRowCell>
-                  ))}
-                </DataGridTableBodyRow>
-              ))}
-            </Fragment>
-          ))
+          groups.map(({ key, rows: groupRows }, groupIndex) => {
+            const [lvl1, lvl2] = groupByLevel1Labels ? key.split('|') : [key, ''];
+            const prevKey = groupIndex > 0 ? groups[groupIndex - 1].key : null;
+            const prevLvl1 = prevKey && groupByLevel1Labels ? prevKey.split('|')[0] : null;
+            const showLvl1Header = !!groupByLevel1Labels && lvl1 !== prevLvl1;
+            return (
+              <Fragment key={`group-${key}`}>
+                {showLvl1Header && (
+                  <tr>
+                    <td
+                      colSpan={totalCols}
+                      className="bg-muted px-4 py-2 font-bold text-xs text-foreground uppercase tracking-widest border-y border-border"
+                    >
+                      {groupByLevel1Labels[lvl1] ?? lvl1}
+                    </td>
+                  </tr>
+                )}
+                <tr>
+                  <td
+                    colSpan={totalCols}
+                    className={groupByLevel1Labels
+                      ? 'bg-muted/40 ps-8 pe-4 py-1 font-semibold text-xs text-muted-foreground uppercase tracking-wide border-b border-border'
+                      : 'bg-muted/60 px-4 py-1.5 font-semibold text-xs text-muted-foreground uppercase tracking-wide border-y border-border'}
+                  >
+                    {groupByLevel1Labels ? (groupByLabels[lvl2] ?? lvl2) : (groupByLabels[key] ?? key)}
+                  </td>
+                </tr>
+                {showDrag && onGroupedDragEnd ? (
+                  <GroupedDndSection rows={groupRows} onDragEnd={onGroupedDragEnd} renderDragOverlay={renderDragOverlay} />
+                ) : (
+                  groupRows.map((row) => (
+                    <DataGridTableBodyRow row={row} key={row.id}>
+                      {row.getVisibleCells().map((cell: Cell<AnyRecord, unknown>, colIndex) => (
+                        <DataGridTableBodyRowCell cell={cell} key={colIndex}>
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </DataGridTableBodyRowCell>
+                      ))}
+                    </DataGridTableBodyRow>
+                  ))
+                )}
+              </Fragment>
+            );
+          })
         ) : (
           <DataGridTableEmpty />
         )}
@@ -423,9 +552,11 @@ export function GenericGrid({
   groupBy,
   groupByLabels,
   groupByOrder,
+  groupByCompute,
+  groupByLevel1Labels,
 }: GenericGridProps) {
   const tenant = getTenantSlug();
-  const effectiveShowDrag = showDrag && !groupBy;
+  const effectiveShowDrag = showDrag;
   const onDataLoadRef = useRef(onDataLoad);
   onDataLoadRef.current = onDataLoad;
   const onSearchRef = useRef(onSearch);
@@ -572,6 +703,38 @@ export function GenericGrid({
         );
       } catch (err) {
         console.error('[GenericGrid] Erro ao reordenar:', err);
+        fetchData();
+      }
+    },
+    [data, total, pagination, fetchData, tenant, moduleConfig],
+  );
+
+  const handleGroupedDragEnd = useCallback(
+    async (activeId: string, overId: string) => {
+      if (!moduleConfig) return;
+      const oldIndex = parseInt(activeId);
+      const newIndex = parseInt(overId);
+      if (isNaN(oldIndex) || isNaN(newIndex)) return;
+
+      const newData = arrayMove(data, oldIndex, newIndex);
+      const baseOrder = total - pagination.pageIndex * pagination.pageSize;
+      const newDataWithOrders = newData.map((item, i) => ({ ...item, order: baseOrder - i } as AnyRecord));
+
+      setData(newDataWithOrders);
+
+      const orderMap = new Map(data.map((item) => [item.id as number, (item.order as number) ?? 0]));
+      const changedItems = newDataWithOrders.filter(
+        (item) => (item.order as number) !== orderMap.get(item.id as number),
+      );
+
+      try {
+        await Promise.all(
+          changedItems.map((item) =>
+            apiPut<unknown>(`/v1/${tenant}/${moduleConfig.slug}/${item.id as number}`, item),
+          ),
+        );
+      } catch (err) {
+        console.error('[GenericGrid] Erro ao reordenar em grupo:', err);
         fetchData();
       }
     },
@@ -886,7 +1049,7 @@ export function GenericGrid({
             )}
 
             {/* Tabela */}
-            {effectiveShowDrag ? (
+            {!groupBy && effectiveShowDrag ? (
               <DataGridTableDndRows
                 handleDragEnd={handleDragEnd}
                 dataIds={dataIds}
@@ -897,6 +1060,11 @@ export function GenericGrid({
                 groupBy={groupBy}
                 groupByLabels={groupByLabels ?? {}}
                 groupByOrder={groupByOrder}
+                groupByCompute={groupByCompute}
+                groupByLevel1Labels={groupByLevel1Labels}
+                showDrag={effectiveShowDrag}
+                onGroupedDragEnd={handleGroupedDragEnd}
+                renderDragOverlay={renderDragOverlay}
               />
             ) : (
               <DataGridTable />

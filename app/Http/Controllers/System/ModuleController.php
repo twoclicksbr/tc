@@ -94,6 +94,20 @@ class ModuleController extends Controller
             $query->where('id', (int) $searchId);
         }
 
+        // Filtro por type (campo enum: module/submodule/pivot)
+        if ($type = $request->input('type')) {
+            if (in_array('type', $fillable, true)) {
+                $query->where('type', $type);
+            }
+        }
+
+        // Filtro por owner_level (campo enum: master/platform/tenant)
+        if ($ownerLevel = $request->input('owner_level')) {
+            if (in_array('owner_level', $fillable, true)) {
+                $query->where('owner_level', $ownerLevel);
+            }
+        }
+
         // Filtro por nome
         if ($searchName = $request->input('search_name')) {
             $searchType = $request->input('search_type', 'contains');
