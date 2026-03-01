@@ -1,5 +1,4 @@
-import { type CSSProperties, Fragment, useCallback, useEffect, useId, useState } from 'react';
-import * as LucideIcons from 'lucide-react';
+import { type CSSProperties, useEffect, useId, useRef, useState } from 'react';
 import {
   closestCenter,
   DndContext,
@@ -21,15 +20,18 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Check, GripVertical, Pencil, Plus, Trash2, X } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { GripVertical, Link2, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { IconPickerModal } from '@/components/icon-picker-modal';
 import { apiDelete, apiGet, apiPost, apiPut } from '@/lib/api';
 import { getTenantSlug } from '@/lib/tenant';
 
@@ -37,153 +39,204 @@ import { getTenantSlug } from '@/lib/tenant';
 // Types
 // ---------------------------------------------------------------------------
 
-export interface ModuleField {
+interface FieldRow {
   id: number;
   module_id: number;
   name: string;
   label: string;
-  icon?: string | null;
   type: string;
-  length?: number | null;
-  precision?: number | null;
-  default?: string | null;
+  length: string | number | null;
+  precision: number | null;
   nullable: boolean;
   required: boolean;
-  min?: string | null;
-  max?: string | null;
   unique: boolean;
   index: boolean;
-  unique_table?: string | null;
-  unique_column?: string | null;
-  fk_table?: string | null;
-  fk_column?: string | null;
-  fk_label?: string | null;
-  auto_from?: string | null;
-  auto_type?: string | null;
-  main: boolean;
-  is_custom: boolean;
-  owner_level: string;
-  owner_id: number;
-  order: number;
-  active: boolean;
-  created_at?: string;
-  updated_at?: string;
-  deleted_at?: string | null;
-}
-
-type FieldFormData = {
-  name: string;
-  label: string;
-  icon: string;
-  type: string;
-  length: string;
-  precision: string;
-  nullable: boolean;
-  required: boolean;
-  min: string;
-  max: string;
-  unique: boolean;
-  index: boolean;
-  unique_table: string;
-  unique_column: string;
+  min: number | null;
+  max: number | null;
+  default: string;
   fk_table: string;
   fk_column: string;
   fk_label: string;
-  auto_from: string;
-  auto_type: string;
-  main: boolean;
   is_custom: boolean;
   owner_level: string;
+  owner_id: number;
   active: boolean;
-};
+  order: number;
+}
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const EMPTY_FORM: FieldFormData = {
-  name: '', label: '', icon: '', type: 'string',
-  length: '', precision: '',
-  nullable: false, required: false, min: '', max: '',
-  unique: false, index: false, unique_table: '', unique_column: '',
-  fk_table: '', fk_column: '', fk_label: '',
-  auto_from: '', auto_type: '',
-  main: false, is_custom: false, owner_level: 'tenant', active: true,
-};
+const FIELD_TYPES = [
+  'STRING', 'INTEGER', 'BIGINT', 'BOOLEAN', 'TEXT',
+  'DATE', 'DATETIME', 'DECIMAL', 'FLOAT', 'ENUM', 'JSON',
+];
 
-const TYPE_BADGE: Record<string, { variant: 'default' | 'primary' | 'secondary' | 'info' | 'warning' }> = {
-  string:    { variant: 'secondary' },
-  integer:   { variant: 'info' },
-  boolean:   { variant: 'warning' },
-  bigint:    { variant: 'primary' },
-  date:      { variant: 'secondary' },
-  datetime:  { variant: 'secondary' },
-  decimal:   { variant: 'info' },
-  text:      { variant: 'default' },
-  json:      { variant: 'warning' },
-  timestamp: { variant: 'secondary' },
-};
+const NO_LENGTH_TYPES   = new Set(['TEXT', 'BOOLEAN', 'DATE', 'DATETIME', 'JSON']);
+const TEXT_LENGTH_TYPES = new Set(['DECIMAL', 'FLOAT', 'ENUM']);
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Normalize — converte record da API para FieldRow
 // ---------------------------------------------------------------------------
 
-function fieldToFormData(field: ModuleField): FieldFormData {
+function normalize(r: Record<string, unknown>): FieldRow {
   return {
-    name:          field.name,
-    label:         field.label,
-    icon:          field.icon ?? '',
-    type:          field.type,
-    length:        field.length != null ? String(field.length) : '',
-    precision:     field.precision != null ? String(field.precision) : '',
-    nullable:      field.nullable,
-    required:      field.required,
-    min:           field.min ?? '',
-    max:           field.max ?? '',
-    unique:        field.unique,
-    index:         field.index,
-    unique_table:  field.unique_table ?? '',
-    unique_column: field.unique_column ?? '',
-    fk_table:      field.fk_table ?? '',
-    fk_column:     field.fk_column ?? '',
-    fk_label:      field.fk_label ?? '',
-    auto_from:     field.auto_from ?? '',
-    auto_type:     field.auto_type ?? '',
-    main:          field.main,
-    is_custom:     field.is_custom,
-    owner_level:   field.owner_level,
-    active:        field.active,
+    id:        r.id as number,
+    module_id: r.module_id as number,
+    name:      (r.name as string) ?? '',
+    label:     (r.label as string) ?? '',
+    type:      ((r.type as string) ?? 'STRING').toUpperCase(),
+    length:    (r.length as string | number | null) ?? null,
+    precision: (r.precision as number | null) ?? null,
+    nullable:  !!(r.nullable),
+    required:  !!(r.required),
+    unique:    !!(r.unique),
+    index:     !!(r.index),
+    min:       (r.min as number | null) ?? null,
+    max:       (r.max as number | null) ?? null,
+    default:   (r.default as string) ?? '',
+    fk_table:    (r.fk_table as string) ?? '',
+    fk_column:   (r.fk_column as string) ?? '',
+    fk_label:    (r.fk_label as string) ?? '',
+    is_custom:   !!(r.is_custom),
+    owner_level: (r.owner_level as string) ?? 'tenant',
+    owner_id:    (r.owner_id as number) ?? 0,
+    active:      r.active !== false,
+    order:       (r.order as number) ?? 1,
   };
 }
 
-function buildPayload(form: FieldFormData, moduleId: number) {
-  return {
-    module_id:     moduleId,
-    name:          form.name,
-    label:         form.label,
-    icon:          form.icon || null,
-    type:          form.type,
-    length:        form.length !== '' ? parseInt(form.length, 10) : null,
-    precision:     form.precision !== '' ? parseInt(form.precision, 10) : null,
-    nullable:      form.nullable,
-    required:      form.required,
-    min:           form.min || null,
-    max:           form.max || null,
-    unique:        form.unique,
-    index:         form.index,
-    unique_table:  form.unique_table || null,
-    unique_column: form.unique_column || null,
-    fk_table:      form.fk_table || null,
-    fk_column:     form.fk_column || null,
-    fk_label:      form.fk_label || null,
-    auto_from:     form.auto_from || null,
-    auto_type:     form.auto_type || null,
-    main:          form.main,
-    is_custom:     form.is_custom,
-    owner_level:   form.owner_level,
-    owner_id:      0,
-    active:        form.active,
-  };
+// ---------------------------------------------------------------------------
+// FkModal
+// ---------------------------------------------------------------------------
+
+type ModuleOption = { id: number; name: string; slug: string };
+type FieldOption  = { id: number; name: string };
+
+interface FkModalProps {
+  open: boolean;
+  fkTable: string;
+  fkColumn: string;
+  fkLabel: string;
+  onConfirm: (table: string, column: string, label: string) => void;
+  onCancel: () => void;
+}
+
+function FkModal({ open, fkTable, fkColumn, fkLabel, onConfirm, onCancel }: FkModalProps) {
+  const [modules,        setModules]        = useState<ModuleOption[]>([]);
+  const [moduleFields,   setModuleFields]   = useState<FieldOption[]>([]);
+  const [loadingModules, setLoadingModules] = useState(false);
+  const [loadingFields,  setLoadingFields]  = useState(false);
+  const [table,  setTable]  = useState('none');
+  const [column, setColumn] = useState('none');
+  const [label,  setLabel]  = useState('none');
+
+  useEffect(() => {
+    if (!open) return;
+    setTable(fkTable   || 'none');
+    setColumn(fkColumn || 'none');
+    setLabel(fkLabel   || 'none');
+    setLoadingModules(true);
+    apiGet<{ data: ModuleOption[] }>(`/v1/${getTenantSlug()}/modules?per_page=100&sort=order&direction=desc`)
+      .then(res => setModules(res.data))
+      .catch(() => {})
+      .finally(() => setLoadingModules(false));
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (table === 'none' || modules.length === 0) {
+      setModuleFields([]);
+      return;
+    }
+    const mod = modules.find(m => m.slug === table);
+    if (!mod) return;
+    setLoadingFields(true);
+    apiGet<{ data: FieldOption[] }>(`/v1/${getTenantSlug()}/module-fields?module_id=${mod.id}&per_page=100&sort=order&direction=asc`)
+      .then(res => setModuleFields(res.data))
+      .catch(() => {})
+      .finally(() => setLoadingFields(false));
+  }, [table, modules]);
+
+  function handleTableChange(v: string) {
+    setTable(v);
+    setColumn('none');
+    setLabel('none');
+  }
+
+  const fieldsDisabled = table === 'none' || loadingFields;
+
+  return (
+    <Dialog open={open} onOpenChange={v => !v && onCancel()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Chave Estrangeira</DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-3 py-1">
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium">Módulos</label>
+            <Select value={table} onValueChange={handleTableChange} disabled={loadingModules}>
+              <SelectTrigger className="h-8 text-sm">
+                <SelectValue placeholder="Selecione" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none" className="text-sm text-muted-foreground">Selecione</SelectItem>
+                {modules.map(m => (
+                  <SelectItem key={m.id} value={m.slug} className="text-sm">{m.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium">Chave de Conexão</label>
+            <Select value={column} onValueChange={setColumn} disabled={fieldsDisabled}>
+              <SelectTrigger className="h-8 text-sm">
+                <SelectValue placeholder="Selecione" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none" className="text-sm text-muted-foreground">Selecione</SelectItem>
+                {moduleFields.map(f => (
+                  <SelectItem key={f.id} value={f.name} className="text-sm">{f.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium">Texto de Exibição</label>
+            <Select value={label} onValueChange={setLabel} disabled={fieldsDisabled}>
+              <SelectTrigger className="h-8 text-sm">
+                <SelectValue placeholder="Selecione" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none" className="text-sm text-muted-foreground">Selecione</SelectItem>
+                {moduleFields.map(f => (
+                  <SelectItem key={f.id} value={f.name} className="text-sm">{f.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+        </div>
+        <DialogFooter>
+          <Button variant="outline" size="sm" onClick={onCancel}>Cancelar</Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => onConfirm(
+              table  === 'none' ? '' : table,
+              column === 'none' ? '' : column,
+              label  === 'none' ? '' : label,
+            )}
+          >
+            Confirmar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -191,126 +244,199 @@ function buildPayload(form: FieldFormData, moduleId: number) {
 // ---------------------------------------------------------------------------
 
 interface SortableRowProps {
-  field: ModuleField;
-  isExpanded: boolean;
-  isConfirmingDelete: boolean;
-  isDndDisabled: boolean;
-  onEdit: () => void;
-  onDelete: () => void;
-  onCancelDelete: () => void;
-  onConfirmDelete: () => void;
+  field: FieldRow;
+  isReadOnly: boolean;
+  onChange: (id: number, key: keyof FieldRow, value: unknown) => void;
+  onDelete: (id: number) => void;
 }
 
-function SortableRow({
-  field,
-  isExpanded,
-  isConfirmingDelete,
-  isDndDisabled,
-  onEdit,
-  onDelete,
-  onCancelDelete,
-  onConfirmDelete,
-}: SortableRowProps) {
+function SortableRow({ field, isReadOnly, onChange, onDelete }: SortableRowProps) {
+  const isCustom    = field.is_custom;
+  const rowReadOnly = isReadOnly || !isCustom;
+
   const { attributes, listeners, isDragging, setNodeRef, transform } = useSortable({
     id: String(field.id),
-    disabled: isDndDisabled,
+    disabled: rowReadOnly,
   });
+
+  const [fkOpen, setFkOpen] = useState(false);
 
   const style: CSSProperties = {
     transform: CSS.Transform.toString(transform),
     opacity: isDragging ? 0 : 1,
-    position: 'relative',
   };
 
-  const typeInfo = TYPE_BADGE[field.type] ?? { variant: 'default' as const };
-  const LucideIcon = field.icon
-    ? (LucideIcons as Record<string, unknown>)[field.icon] as React.ComponentType<{ className?: string }> | undefined
-    : undefined;
+  const isBigint          = field.type === 'BIGINT';
+  const lengthDisabled    = NO_LENGTH_TYPES.has(field.type) || rowReadOnly;
+  const lengthIsText      = TEXT_LENGTH_TYPES.has(field.type);
+  const lengthPlaceholder = field.type === 'ENUM' ? "'a','b','c'" : lengthIsText ? '10,2' : '255';
+  const hasFk             = field.fk_table !== '' || field.fk_column !== '' || field.fk_label !== '';
 
   return (
     <tr
       ref={setNodeRef}
       style={style}
-      className={`border-b text-sm ${isExpanded ? 'bg-muted/30' : 'hover:bg-muted/20'}`}
+      className={`border-b hover:bg-muted/20 group ${!isCustom ? 'bg-muted/50' : ''}`}
     >
+
       {/* Drag handle */}
-      <td className="w-10 px-2">
-        {!isDndDisabled && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span
-                  className="flex items-center justify-center cursor-grab active:cursor-grabbing text-muted-foreground outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0"
-                  {...attributes}
-                  {...listeners}
-                >
-                  <GripVertical className="size-4" />
-                </span>
-              </TooltipTrigger>
-              <TooltipContent side="right">Arrastar para reordenar</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+      <td className="w-8 px-1.5">
+        {!rowReadOnly && (
+          <span
+            className="flex items-center justify-center cursor-grab active:cursor-grabbing text-muted-foreground opacity-40 group-hover:opacity-100 transition-opacity outline-none focus:outline-none"
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical className="size-4" />
+          </span>
         )}
       </td>
 
       {/* Nome */}
-      <td className="px-2 py-2 font-mono text-xs">
-        <div className="flex items-center gap-1.5">
-          {LucideIcon && <LucideIcon className="size-3.5 text-muted-foreground shrink-0" />}
-          {field.name}
-        </div>
+      <td className="px-1.5 py-1.5">
+        <Input
+          value={field.name}
+          onChange={e => onChange(field.id, 'name', e.target.value)}
+          className="h-8 text-sm font-mono"
+          placeholder="field_name"
+          disabled={rowReadOnly}
+        />
       </td>
-
-      {/* Rótulo */}
-      <td className="px-2 py-2 text-sm">{field.label}</td>
 
       {/* Tipo */}
-      <td className="px-2 py-2">
-        <Badge variant={typeInfo.variant} appearance="light" size="sm">{field.type}</Badge>
+      <td className="px-1.5 py-1.5" style={{ minWidth: '130px' }}>
+        <Select
+          value={field.type}
+          onValueChange={v => {
+            const wasTextLength = TEXT_LENGTH_TYPES.has(field.type);
+            const isTextLength  = TEXT_LENGTH_TYPES.has(v);
+            const isNoLength    = NO_LENGTH_TYPES.has(v);
+            if (isNoLength || isTextLength || wasTextLength || v === 'BIGINT' || field.type === 'BIGINT') {
+              onChange(field.id, 'length', null);
+            }
+            onChange(field.id, 'type', v);
+          }}
+          disabled={rowReadOnly}
+        >
+          <SelectTrigger className="h-8 text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {FIELD_TYPES.map(t => (
+              <SelectItem key={t} value={t} className="text-sm">{t}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </td>
 
-      {/* Obrigatório */}
-      <td className="px-2 py-2 text-center">
-        {field.required
-          ? <Badge variant="success" appearance="light" size="sm">Sim</Badge>
-          : <Badge variant="secondary" appearance="light" size="sm">Não</Badge>
-        }
+      {/* Tamanho / FK */}
+      <td className="px-1.5 py-1.5" style={{ width: '96px' }}>
+        {isBigint ? (
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className={`h-8 w-full text-xs gap-1 ${hasFk ? 'border-blue-400 text-blue-600 hover:text-blue-600' : ''}`}
+              onClick={() => setFkOpen(true)}
+              disabled={rowReadOnly}
+            >
+              <Link2 className="size-3" />
+              FK
+            </Button>
+            <FkModal
+              open={fkOpen}
+              fkTable={field.fk_table}
+              fkColumn={field.fk_column}
+              fkLabel={field.fk_label}
+              onConfirm={(table, column, label) => {
+                onChange(field.id, 'fk_table',  table);
+                onChange(field.id, 'fk_column', column);
+                onChange(field.id, 'fk_label',  label);
+                setFkOpen(false);
+              }}
+              onCancel={() => setFkOpen(false)}
+            />
+          </>
+        ) : (
+          <Input
+            type={lengthIsText ? 'text' : 'number'}
+            value={field.length ?? ''}
+            onChange={e => onChange(field.id, 'length', e.target.value === '' ? null : (lengthIsText ? e.target.value : parseInt(e.target.value, 10)))}
+            className="h-8 text-sm"
+            placeholder={lengthPlaceholder}
+            disabled={lengthDisabled}
+          />
+        )}
       </td>
 
       {/* Nulo */}
-      <td className="px-2 py-2 text-center">
-        {field.nullable
-          ? <Badge variant="success" appearance="light" size="sm">Sim</Badge>
-          : <Badge variant="secondary" appearance="light" size="sm">Não</Badge>
-        }
+      <td className="px-1.5 py-1.5 text-center">
+        <Checkbox
+          checked={field.nullable}
+          onCheckedChange={v => onChange(field.id, 'nullable', !!v)}
+          disabled={rowReadOnly}
+        />
       </td>
 
-      {/* Ações */}
-      <td className="px-2 py-2">
-        {isConfirmingDelete ? (
-          <div className="flex items-center gap-1 justify-end">
-            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={onCancelDelete} title="Cancelar">
-              <X className="size-3.5" />
-            </Button>
-            <Button variant="destructive" size="sm" className="h-7 w-7 p-0" onClick={onConfirmDelete} title="Confirmar exclusão">
-              <Check className="size-3.5" />
-            </Button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-1 justify-end">
-            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={onEdit} title="Editar">
-              <Pencil className="size-3.5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-              onClick={onDelete}
-              title="Deletar"
-            >
-              <Trash2 className="size-3.5" />
-            </Button>
-          </div>
+      {/* Obrigatório */}
+      <td className="px-1.5 py-1.5 text-center">
+        <Checkbox
+          checked={field.required}
+          onCheckedChange={v => onChange(field.id, 'required', !!v)}
+          disabled={rowReadOnly}
+        />
+      </td>
+
+      {/* Único */}
+      <td className="px-1.5 py-1.5 text-center">
+        <Checkbox
+          checked={field.unique}
+          onCheckedChange={v => onChange(field.id, 'unique', !!v)}
+          disabled={rowReadOnly}
+        />
+      </td>
+
+      {/* Índice */}
+      <td className="px-1.5 py-1.5 text-center">
+        <Checkbox
+          checked={field.index}
+          onCheckedChange={v => onChange(field.id, 'index', !!v)}
+          disabled={rowReadOnly}
+        />
+      </td>
+
+      {/* Default */}
+      <td className="px-1.5 py-1.5">
+        <Input
+          value={field.default ?? ''}
+          onChange={e => onChange(field.id, 'default', e.target.value)}
+          className="h-8 text-sm"
+          placeholder="—"
+          disabled={rowReadOnly}
+        />
+      </td>
+
+      {/* Ativo */}
+      <td className="px-1.5 py-1.5 text-center">
+        <Checkbox
+          checked={field.active}
+          onCheckedChange={v => onChange(field.id, 'active', !!v)}
+          disabled={rowReadOnly}
+        />
+      </td>
+
+      {/* Deletar */}
+      <td className="w-8 px-1.5 py-1.5 text-center">
+        {!isReadOnly && isCustom && (
+          <button
+            type="button"
+            className="text-destructive opacity-40 hover:opacity-100 transition-opacity"
+            onClick={() => onDelete(field.id)}
+            title="Remover campo"
+          >
+            <Trash2 className="size-4" />
+          </button>
         )}
       </td>
     </tr>
@@ -318,288 +444,79 @@ function SortableRow({
 }
 
 // ---------------------------------------------------------------------------
-// ExpandedFormRow
+// OverlayRow — clone visual para o DragOverlay
 // ---------------------------------------------------------------------------
 
-interface ExpandedFormRowProps {
-  form: FieldFormData;
-  onChange: (updates: Partial<FieldFormData>) => void;
-  onSave: () => void;
-  onCancel: () => void;
-  saving: boolean;
-  errors: Record<string, string[]>;
-  onOpenIconPicker: () => void;
+function OverlayRow({ field }: { field: FieldRow }) {
+  return (
+    <table className="w-full text-sm border border-border rounded-md shadow-lg bg-background">
+      <tbody>
+        <tr>
+          <td className="w-8 px-1.5 py-2">
+            <GripVertical className="size-4 text-muted-foreground" />
+          </td>
+          <td className="px-1.5 py-2 font-mono text-sm">{field.name}</td>
+          <td className="px-1.5 py-2 text-sm text-muted-foreground">{field.type}</td>
+          <td colSpan={8} />
+        </tr>
+      </tbody>
+    </table>
+  );
 }
 
-function ExpandedFormRow({ form, onChange, onSave, onCancel, saving, errors, onOpenIconPicker }: ExpandedFormRowProps) {
-  const LucideIcon = form.icon
-    ? (LucideIcons as Record<string, unknown>)[form.icon] as React.ComponentType<{ className?: string }> | undefined
-    : undefined;
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
-  const g12: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '0.75rem' };
+// Converte FieldRow para payload da API (type em minúsculo)
+function toApiPayload(field: FieldRow): Record<string, unknown> {
+  return { ...field, type: field.type.toLowerCase() };
+}
 
-  return (
-    <tr>
-      <td colSpan={7} className="p-4 bg-muted/10 border-b">
-        <div className="flex flex-col gap-4">
+// Ordena campos: id (primeiro) → custom (por order ASC) → fixed bottom (ordem fixa)
+const FIXED_BOTTOM = ['order', 'active', 'created_at', 'updated_at', 'deleted_at'];
 
-          {/* Seção: Identidade */}
-          <div>
-            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Identidade</p>
-            <div style={g12}>
-              {/* name (3) */}
-              <div style={{ gridColumn: 'span 3' }} className="flex flex-col gap-1">
-                <Label className="text-xs">Nome <span className="text-destructive">*</span></Label>
-                <Input
-                  value={form.name}
-                  onChange={e => onChange({ name: e.target.value })}
-                  className="h-7 text-xs font-mono"
-                  placeholder="field_name"
-                />
-                {errors.name && <p className="text-xs text-destructive">{errors.name[0]}</p>}
-              </div>
-              {/* label (3) */}
-              <div style={{ gridColumn: 'span 3' }} className="flex flex-col gap-1">
-                <Label className="text-xs">Rótulo <span className="text-destructive">*</span></Label>
-                <Input
-                  value={form.label}
-                  onChange={e => onChange({ label: e.target.value })}
-                  className="h-7 text-xs"
-                  placeholder="Nome do Campo"
-                />
-                {errors.label && <p className="text-xs text-destructive">{errors.label[0]}</p>}
-              </div>
-              {/* icon (1) */}
-              <div style={{ gridColumn: 'span 1' }} className="flex flex-col gap-1">
-                <Label className="text-xs">Ícone</Label>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-7 w-full p-0"
-                  title={form.icon || 'Selecionar ícone'}
-                  onClick={onOpenIconPicker}
-                >
-                  {LucideIcon ? <LucideIcon className="size-3.5" /> : <span className="text-[10px] text-muted-foreground">—</span>}
-                </Button>
-              </div>
-              {/* type (2) */}
-              <div style={{ gridColumn: 'span 2' }} className="flex flex-col gap-1">
-                <Label className="text-xs">Tipo <span className="text-destructive">*</span></Label>
-                <Select value={form.type} onValueChange={v => onChange({ type: v })}>
-                  <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {Object.keys(TYPE_BADGE).map(k => (
-                      <SelectItem key={k} value={k} className="text-xs">{k}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              {/* length (1) */}
-              <div style={{ gridColumn: 'span 1' }} className="flex flex-col gap-1">
-                <Label className="text-xs">Tamanho</Label>
-                <Input
-                  type="number"
-                  value={form.length}
-                  onChange={e => onChange({ length: e.target.value })}
-                  className="h-7 text-xs"
-                  placeholder="255"
-                />
-              </div>
-              {/* precision (1) */}
-              <div style={{ gridColumn: 'span 1' }} className="flex flex-col gap-1">
-                <Label className="text-xs">Dec.</Label>
-                <Input
-                  type="number"
-                  value={form.precision}
-                  onChange={e => onChange({ precision: e.target.value })}
-                  className="h-7 text-xs"
-                  placeholder="2"
-                />
-              </div>
-            </div>
-          </div>
+function sortFields(fields: FieldRow[]): FieldRow[] {
+  return [...fields].sort((a, b) => {
+    const aIsId     = a.name === 'id';
+    const bIsId     = b.name === 'id';
+    const aIsFixed  = FIXED_BOTTOM.includes(a.name);
+    const bIsFixed  = FIXED_BOTTOM.includes(b.name);
 
-          {/* Seção: Validação */}
-          <div>
-            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Validação</p>
-            <div style={g12}>
-              <div style={{ gridColumn: 'span 2' }} className="flex flex-col gap-1">
-                <Label className="text-xs">Obrigatório</Label>
-                <div className="flex items-center h-7">
-                  <Switch size="sm" checked={form.required} onCheckedChange={v => onChange({ required: v })} />
-                </div>
-              </div>
-              <div style={{ gridColumn: 'span 2' }} className="flex flex-col gap-1">
-                <Label className="text-xs">Nulo</Label>
-                <div className="flex items-center h-7">
-                  <Switch size="sm" checked={form.nullable} onCheckedChange={v => onChange({ nullable: v })} />
-                </div>
-              </div>
-              <div style={{ gridColumn: 'span 2' }} className="flex flex-col gap-1">
-                <Label className="text-xs">Único</Label>
-                <div className="flex items-center h-7">
-                  <Switch size="sm" checked={form.unique} onCheckedChange={v => onChange({ unique: v })} />
-                </div>
-              </div>
-              <div style={{ gridColumn: 'span 2' }} className="flex flex-col gap-1">
-                <Label className="text-xs">Índice</Label>
-                <div className="flex items-center h-7">
-                  <Switch size="sm" checked={form.index} onCheckedChange={v => onChange({ index: v })} />
-                </div>
-              </div>
-              <div style={{ gridColumn: 'span 2' }} className="flex flex-col gap-1">
-                <Label className="text-xs">Min</Label>
-                <Input value={form.min} onChange={e => onChange({ min: e.target.value })} className="h-7 text-xs" placeholder="0" />
-              </div>
-              <div style={{ gridColumn: 'span 2' }} className="flex flex-col gap-1">
-                <Label className="text-xs">Max</Label>
-                <Input value={form.max} onChange={e => onChange({ max: e.target.value })} className="h-7 text-xs" placeholder="255" />
-              </div>
-            </div>
-          </div>
-
-          {/* Seção: Unicidade Remota (só quando unique=true) */}
-          {form.unique && (
-            <div>
-              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Unicidade Remota</p>
-              <div style={g12}>
-                <div style={{ gridColumn: 'span 4' }} className="flex flex-col gap-1">
-                  <Label className="text-xs">Tabela</Label>
-                  <Input value={form.unique_table} onChange={e => onChange({ unique_table: e.target.value })} className="h-7 text-xs" placeholder="modules" />
-                </div>
-                <div style={{ gridColumn: 'span 4' }} className="flex flex-col gap-1">
-                  <Label className="text-xs">Coluna</Label>
-                  <Input value={form.unique_column} onChange={e => onChange({ unique_column: e.target.value })} className="h-7 text-xs" placeholder="slug" />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Seção: Relacionamento FK (só quando type=bigint) */}
-          {form.type === 'bigint' && (
-            <div>
-              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Relacionamento FK</p>
-              <div style={g12}>
-                <div style={{ gridColumn: 'span 4' }} className="flex flex-col gap-1">
-                  <Label className="text-xs">Tabela FK</Label>
-                  <Input value={form.fk_table} onChange={e => onChange({ fk_table: e.target.value })} className="h-7 text-xs" placeholder="modules" />
-                </div>
-                <div style={{ gridColumn: 'span 4' }} className="flex flex-col gap-1">
-                  <Label className="text-xs">Coluna FK</Label>
-                  <Input value={form.fk_column} onChange={e => onChange({ fk_column: e.target.value })} className="h-7 text-xs" placeholder="id" />
-                </div>
-                <div style={{ gridColumn: 'span 4' }} className="flex flex-col gap-1">
-                  <Label className="text-xs">Label FK</Label>
-                  <Input value={form.fk_label} onChange={e => onChange({ fk_label: e.target.value })} className="h-7 text-xs" placeholder="name" />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Seção: Automação */}
-          <div>
-            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Automação</p>
-            <div style={g12}>
-              <div style={{ gridColumn: 'span 4' }} className="flex flex-col gap-1">
-                <Label className="text-xs">Origem Auto</Label>
-                <Input value={form.auto_from} onChange={e => onChange({ auto_from: e.target.value })} className="h-7 text-xs" placeholder="name" />
-              </div>
-              <div style={{ gridColumn: 'span 4' }} className="flex flex-col gap-1">
-                <Label className="text-xs">Tipo Auto</Label>
-                <Select
-                  value={form.auto_type || '__none__'}
-                  onValueChange={v => onChange({ auto_type: v === '__none__' ? '' : v })}
-                >
-                  <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__" className="text-xs">—</SelectItem>
-                    <SelectItem value="slug" className="text-xs">slug</SelectItem>
-                    <SelectItem value="uppercase" className="text-xs">uppercase</SelectItem>
-                    <SelectItem value="lowercase" className="text-xs">lowercase</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-
-          {/* Seção: Controle */}
-          <div>
-            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Controle</p>
-            <div style={g12}>
-              <div style={{ gridColumn: 'span 2' }} className="flex flex-col gap-1">
-                <Label className="text-xs">Sistema</Label>
-                <div className="flex items-center h-7">
-                  <Switch size="sm" checked={form.main} onCheckedChange={v => onChange({ main: v })} />
-                </div>
-              </div>
-              <div style={{ gridColumn: 'span 2' }} className="flex flex-col gap-1">
-                <Label className="text-xs">Customizado</Label>
-                <div className="flex items-center h-7">
-                  <Switch size="sm" checked={form.is_custom} onCheckedChange={v => onChange({ is_custom: v })} />
-                </div>
-              </div>
-              <div style={{ gridColumn: 'span 3' }} className="flex flex-col gap-1">
-                <Label className="text-xs">Proprietário</Label>
-                <Select value={form.owner_level} onValueChange={v => onChange({ owner_level: v })}>
-                  <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="master" className="text-xs">Master</SelectItem>
-                    <SelectItem value="platform" className="text-xs">Plataforma</SelectItem>
-                    <SelectItem value="tenant" className="text-xs">Tenant</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div style={{ gridColumn: 'span 2' }} className="flex flex-col gap-1">
-                <Label className="text-xs">Ativo</Label>
-                <div className="flex items-center h-7">
-                  <Switch size="sm" checked={form.active} onCheckedChange={v => onChange({ active: v })} />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Botões */}
-          <div className="flex items-center justify-end gap-2 pt-2 border-t">
-            <Button variant="outline" size="sm" onClick={onCancel} disabled={saving}>
-              Cancelar
-            </Button>
-            <Button
-              size="sm"
-              onClick={onSave}
-              disabled={saving || !form.name.trim() || !form.label.trim()}
-            >
-              {saving ? 'Salvando...' : 'Salvar'}
-            </Button>
-          </div>
-
-        </div>
-      </td>
-    </tr>
-  );
+    if (aIsId && !bIsId) return -1;
+    if (!aIsId && bIsId) return 1;
+    if (!aIsFixed && !bIsFixed) return a.order - b.order;
+    if (!aIsFixed && bIsFixed)  return -1;
+    if (aIsFixed  && !bIsFixed) return 1;
+    return FIXED_BOTTOM.indexOf(a.name) - FIXED_BOTTOM.indexOf(b.name);
+  });
 }
 
 // ---------------------------------------------------------------------------
 // ModuleFieldsTab
 // ---------------------------------------------------------------------------
 
-interface ModuleFieldsTabProps {
+export interface ModuleFieldsTabProps {
   moduleId: number;
+  mode: string;
   active: boolean;
 }
 
-export function ModuleFieldsTab({ moduleId, active }: ModuleFieldsTabProps) {
-  const tenant  = getTenantSlug();
-  const dndId   = useId();
+export function ModuleFieldsTab({ moduleId, mode }: ModuleFieldsTabProps) {
+  const tenant     = getTenantSlug();
+  const dndId      = useId();
+  const isReadOnly = mode === 'show';
 
-  const [fields, setFields]                     = useState<ModuleField[]>([]);
-  const [loading, setLoading]                   = useState(false);
-  const [expandedId, setExpandedId]             = useState<number | 'new' | null>(null);
-  const [formData, setFormData]                 = useState<FieldFormData>(EMPTY_FORM);
-  const [saving, setSaving]                     = useState(false);
-  const [errors, setErrors]                     = useState<Record<string, string[]>>({});
-  const [activeId, setActiveId]                 = useState<UniqueIdentifier | null>(null);
-  const [confirmDeleteId, setConfirmDeleteId]   = useState<number | null>(null);
-  const [iconPickerOpen, setIconPickerOpen]     = useState(false);
+  const [fields,  setFields]  = useState<FieldRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
+
+  // Ref para sempre ter o estado mais recente nos debounce timers
+  const fieldsRef      = useRef<FieldRow[]>([]);
+  const debounceTimers = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+
+  // Mantém o ref sincronizado com o state
+  useEffect(() => { fieldsRef.current = fields; }, [fields]);
 
   const sensors = useSensors(
     useSensor(MouseSensor, {}),
@@ -607,89 +524,81 @@ export function ModuleFieldsTab({ moduleId, active }: ModuleFieldsTabProps) {
     useSensor(KeyboardSensor, {}),
   );
 
-  const fieldIds      = fields.map(f => String(f.id));
-  const isDndDisabled = expandedId !== null;
-
-  const loadFields = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({
-        module_id: String(moduleId),
-        per_page:  '100',
-        sort:      'order',
-        direction: 'asc',
-      });
-      const res = await apiGet<{ data: ModuleField[] }>(`/v1/${tenant}/module-fields?${params}`);
-      setFields(res.data);
-    } catch {
-      setFields([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [moduleId, tenant]);
+  // ── Carregar campos da API ─────────────────────────────────────────────────
 
   useEffect(() => {
-    if (active && moduleId) loadFields();
-  }, [active, moduleId, loadFields]);
+    if (!moduleId) return;
+    setLoading(true);
+    apiGet<{ data: Record<string, unknown>[] }>(
+      `/v1/${tenant}/module-fields?module_id=${moduleId}&per_page=200&sort=order&direction=asc`,
+    )
+      .then(res => setFields(sortFields(res.data.map(normalize))))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [moduleId, tenant]);
+
+  const fieldIds    = fields.map(f => String(f.id));
+  const activeField = activeId ? fields.find(f => String(f.id) === String(activeId)) : null;
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
-  function handleNew() {
-    setExpandedId('new');
-    setFormData(EMPTY_FORM);
-    setErrors({});
-    setConfirmDeleteId(null);
-  }
+  function handleChange(id: number, key: keyof FieldRow, value: unknown) {
+    // 1. Update local state imediato
+    setFields(prev => prev.map(f => f.id === id ? { ...f, [key]: value } : f));
 
-  function handleEdit(field: ModuleField) {
-    setExpandedId(field.id);
-    setFormData(fieldToFormData(field));
-    setErrors({});
-    setConfirmDeleteId(null);
-  }
-
-  function handleCancel() {
-    setExpandedId(null);
-    setErrors({});
-  }
-
-  async function handleSave() {
-    if (!formData.name.trim() || !formData.label.trim()) return;
-    setSaving(true);
-    setErrors({});
-    try {
-      const payload = buildPayload(formData, moduleId);
-      if (expandedId === 'new') {
-        await apiPost<ModuleField>(`/v1/${tenant}/module-fields`, payload);
-      } else {
-        await apiPut<ModuleField>(`/v1/${tenant}/module-fields/${expandedId}`, payload);
+    // 2. Debounce PUT 800ms — usa fieldsRef para pegar o estado mais recente
+    const existing = debounceTimers.current.get(id);
+    if (existing) clearTimeout(existing);
+    const timer = setTimeout(() => {
+      debounceTimers.current.delete(id);
+      const field = fieldsRef.current.find(f => f.id === id);
+      if (field) {
+        apiPut(`/v1/${tenant}/module-fields/${id}`, toApiPayload(field))
+          .catch(err => console.error('[ModuleFieldsTab] Erro ao atualizar campo:', err));
       }
-      setExpandedId(null);
-      await loadFields();
-    } catch (err: unknown) {
-      const e = err as { status?: number; data?: { errors?: Record<string, string[]> } };
-      if (e?.status === 422 && e?.data?.errors) setErrors(e.data.errors);
-    } finally {
-      setSaving(false);
-    }
+    }, 800);
+    debounceTimers.current.set(id, timer);
   }
 
-  async function handleConfirmDelete(id: number) {
+  async function handleAdd() {
     try {
-      await apiDelete<{ message: string }>(`/v1/${tenant}/module-fields/${id}`);
-      setConfirmDeleteId(null);
-      if (expandedId === id) setExpandedId(null);
-      await loadFields();
-    } catch {
-      setConfirmDeleteId(null);
+      const saved = await apiPost<Record<string, unknown>>(`/v1/${tenant}/module-fields`, {
+        module_id:   moduleId,
+        name:        `campo_${Date.now()}`,
+        label:       'Novo Campo',
+        type:        'string',
+        length:      255,
+        nullable:    true,
+        required:    false,
+        unique:      false,
+        index:       false,
+        main:        false,
+        is_custom:   true,
+        owner_level: 'tenant',
+        owner_id:    0,
+        order:       1,
+        active:      true,
+      });
+      setFields(prev => sortFields([...prev, normalize(saved)]));
+    } catch (err) {
+      console.error('[ModuleFieldsTab] Erro ao criar campo:', err);
     }
   }
 
-  const handleDragStart = useCallback((event: DragStartEvent) => {
-    setActiveId(event.active.id);
-  }, []);
+  async function handleDelete(id: number) {
+    try {
+      await apiDelete(`/v1/${tenant}/module-fields/${id}`);
+      setFields(prev => prev.filter(f => f.id !== id));
+    } catch (err) {
+      console.error('[ModuleFieldsTab] Erro ao deletar campo:', err);
+    }
+  }
 
-  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
+  function handleDragStart(event: DragStartEvent) {
+    setActiveId(event.active.id);
+  }
+
+  async function handleDragEnd(event: DragEndEvent) {
     setActiveId(null);
     (document.activeElement as HTMLElement)?.blur();
     const { active, over } = event;
@@ -699,55 +608,56 @@ export function ModuleFieldsTab({ moduleId, active }: ModuleFieldsTabProps) {
     const newIndex = fields.findIndex(f => String(f.id) === String(over.id));
     if (oldIndex === -1 || newIndex === -1) return;
 
-    const reordered  = arrayMove(fields, oldIndex, newIndex);
-    const withOrders = reordered.map((f, i) => ({ ...f, order: i + 1 }));
+    const reordered = arrayMove(fields, oldIndex, newIndex);
 
-    // Optimistic update
-    setFields(withOrders);
+    // Redistribui os valores de order existentes dos campos custom entre as novas posições.
+    // sortFields usa order ASC para campos custom: menor order = visualmente primeiro.
+    const oldCustomOrders = fields
+      .filter(f => f.is_custom)
+      .sort((a, b) => a.order - b.order)
+      .map(f => f.order);
 
-    // Save only changed items (same pattern as GenericGrid)
+    let ci = 0;
+    const newFields = reordered.map(f =>
+      f.is_custom ? { ...f, order: oldCustomOrders[ci++] } : f,
+    );
+
     const orderMap = new Map(fields.map(f => [f.id, f.order]));
-    const changed  = withOrders.filter(f => f.order !== orderMap.get(f.id));
+    const changed  = newFields.filter(f => f.order !== orderMap.get(f.id));
+
+    setFields(sortFields(newFields));
 
     try {
-      await Promise.all(changed.map(f => apiPut(`/v1/${tenant}/module-fields/${f.id}`, f)));
-    } catch {
-      await loadFields();
+      await Promise.all(
+        changed.map(f => apiPut(`/v1/${tenant}/module-fields/${f.id}`, { order: f.order })),
+      );
+    } catch (err) {
+      console.error('[ModuleFieldsTab] Erro ao reordenar campos:', err);
+      // rollback: recarrega do banco
+      apiGet<{ data: Record<string, unknown>[] }>(
+        `/v1/${tenant}/module-fields?module_id=${moduleId}&per_page=200&sort=order&direction=asc`,
+      ).then(res => setFields(sortFields(res.data.map(normalize)))).catch(() => {});
     }
-  }, [fields, tenant, loadFields]);
+  }
 
-  const handleDragCancel = useCallback(() => {
+  function handleDragCancel() {
     setActiveId(null);
     (document.activeElement as HTMLElement)?.blur();
-  }, []);
-
-  const activeField = activeId ? fields.find(f => String(f.id) === String(activeId)) : null;
+  }
 
   // ── Render ────────────────────────────────────────────────────────────────
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <p className="text-sm text-muted-foreground">Carregando campos...</p>
+      <div className="py-8 text-center text-sm text-muted-foreground">
+        Carregando campos...
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className={`flex flex-col gap-3 ${isReadOnly ? 'pointer-events-none opacity-60' : ''}`}>
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-muted-foreground">
-          {fields.length} campo{fields.length !== 1 ? 's' : ''}
-        </p>
-        <Button size="sm" variant="outline" onClick={handleNew} disabled={expandedId !== null}>
-          <Plus className="size-3.5 mr-1" />
-          Novo Campo
-        </Button>
-      </div>
-
-      {/* Table */}
       <DndContext
         id={dndId}
         collisionDetection={closestCenter}
@@ -757,102 +667,63 @@ export function ModuleFieldsTab({ moduleId, active }: ModuleFieldsTabProps) {
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
-        <table className="w-full text-sm border-collapse">
-          <thead>
-            <tr className="border-b text-xs text-muted-foreground">
-              <th className="w-10" />
-              <th className="px-2 py-2 text-left font-medium" style={{ width: '20%' }}>Nome</th>
-              <th className="px-2 py-2 text-left font-medium" style={{ width: '20%' }}>Rótulo</th>
-              <th className="px-2 py-2 text-left font-medium" style={{ width: '15%' }}>Tipo</th>
-              <th className="px-2 py-2 text-center font-medium" style={{ width: '8%' }}>Obrigatório</th>
-              <th className="px-2 py-2 text-center font-medium" style={{ width: '8%' }}>Nulo</th>
-              <th className="px-2 py-2 text-right font-medium w-20">Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-
-            {/* Create row (outside DnD, at top) */}
-            {expandedId === 'new' && (
-              <ExpandedFormRow
-                form={formData}
-                onChange={updates => setFormData(prev => ({ ...prev, ...updates }))}
-                onSave={handleSave}
-                onCancel={handleCancel}
-                saving={saving}
-                errors={errors}
-                onOpenIconPicker={() => setIconPickerOpen(true)}
-              />
-            )}
-
-            <SortableContext items={fieldIds} strategy={verticalListSortingStrategy}>
-              {fields.map(field => (
-                <Fragment key={field.id}>
-                  <SortableRow
-                    field={field}
-                    isExpanded={expandedId === field.id}
-                    isConfirmingDelete={confirmDeleteId === field.id}
-                    isDndDisabled={isDndDisabled}
-                    onEdit={() => handleEdit(field)}
-                    onDelete={() => { setConfirmDeleteId(field.id); setExpandedId(null); }}
-                    onCancelDelete={() => setConfirmDeleteId(null)}
-                    onConfirmDelete={() => handleConfirmDelete(field.id)}
-                  />
-                  {expandedId === field.id && (
-                    <ExpandedFormRow
-                      form={formData}
-                      onChange={updates => setFormData(prev => ({ ...prev, ...updates }))}
-                      onSave={handleSave}
-                      onCancel={handleCancel}
-                      saving={saving}
-                      errors={errors}
-                      onOpenIconPicker={() => setIconPickerOpen(true)}
-                    />
-                  )}
-                </Fragment>
-              ))}
-            </SortableContext>
-
-            {fields.length === 0 && expandedId !== 'new' && (
-              <tr>
-                <td colSpan={7} className="text-center py-8 text-sm text-muted-foreground">
-                  Nenhum campo cadastrado
-                </td>
+        <div className="overflow-x-auto rounded-md border border-border">
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr className="bg-muted border-b">
+                <th className="w-8" />
+                <th className="px-2 py-2.5 text-left text-sm font-semibold text-muted-foreground">Nome</th>
+                <th className="px-2 py-2.5 text-left text-sm font-semibold text-muted-foreground">Tipo</th>
+                <th className="px-2 py-2.5 text-left text-sm font-semibold text-muted-foreground" style={{ width: '96px' }}>Tamanho</th>
+                <th className="px-2 py-2.5 text-center text-sm font-semibold text-muted-foreground" style={{ width: '52px' }}>Nulo</th>
+                <th className="px-2 py-2.5 text-center text-sm font-semibold text-muted-foreground" style={{ width: '76px' }}>Obrigatório</th>
+                <th className="px-2 py-2.5 text-center text-sm font-semibold text-muted-foreground" style={{ width: '52px' }}>Único</th>
+                <th className="px-2 py-2.5 text-center text-sm font-semibold text-muted-foreground" style={{ width: '52px' }}>Índice</th>
+                <th className="px-2 py-2.5 text-left text-sm font-semibold text-muted-foreground">Default</th>
+                <th className="px-2 py-2.5 text-center text-sm font-semibold text-muted-foreground" style={{ width: '52px' }}>Ativo</th>
+                <th className="w-8" />
               </tr>
-            )}
+            </thead>
+            <tbody>
+              <SortableContext items={fieldIds} strategy={verticalListSortingStrategy}>
+                {fields.map(field => (
+                  <SortableRow
+                    key={field.id}
+                    field={field}
+                    isReadOnly={isReadOnly}
+                    onChange={handleChange}
+                    onDelete={handleDelete}
+                  />
+                ))}
+              </SortableContext>
 
-          </tbody>
-        </table>
+              {fields.length === 0 && (
+                <tr>
+                  <td colSpan={11} className="text-center py-8 text-sm text-muted-foreground">
+                    Nenhum campo cadastrado
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
 
         <DragOverlay dropAnimation={null}>
-          {activeField ? (
-            <table className="w-full text-sm">
-              <tbody>
-                <tr className="bg-background border shadow-lg">
-                  <td className="w-10 px-2 py-2">
-                    <GripVertical className="size-4 text-muted-foreground" />
-                  </td>
-                  <td className="px-2 py-2 font-mono text-xs">{activeField.name}</td>
-                  <td className="px-2 py-2 text-sm">{activeField.label}</td>
-                  <td className="px-2 py-2">
-                    {(() => {
-                      const t = TYPE_BADGE[activeField.type] ?? { variant: 'default' as const };
-                      return <Badge variant={t.variant} appearance="light" size="sm">{activeField.type}</Badge>;
-                    })()}
-                  </td>
-                  <td colSpan={3} />
-                </tr>
-              </tbody>
-            </table>
-          ) : null}
+          {activeField ? <OverlayRow field={activeField} /> : null}
         </DragOverlay>
       </DndContext>
 
-      <IconPickerModal
-        open={iconPickerOpen}
-        onClose={() => setIconPickerOpen(false)}
-        onSelect={name => { setFormData(prev => ({ ...prev, icon: name })); setIconPickerOpen(false); }}
-        selected={formData.icon}
-      />
+      {/* Botão Adicionar Campo */}
+      {!isReadOnly && (
+        <button
+          type="button"
+          onClick={handleAdd}
+          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-md border border-dashed border-border text-sm text-muted-foreground hover:bg-muted transition-colors"
+        >
+          <Plus className="size-4" />
+          Adicionar Campo
+        </button>
+      )}
 
     </div>
   );

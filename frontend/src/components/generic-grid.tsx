@@ -1,4 +1,5 @@
 import React, { CSSProperties, Fragment, type ComponentType, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   type Cell,
   type Column,
@@ -20,8 +21,8 @@ import {
   MouseSensor,
   TouchSensor,
   type DragEndEvent,
-  type DragStartEvent,
   type UniqueIdentifier,
+  useDndContext,
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
@@ -116,7 +117,9 @@ export interface ColumnConfig {
 }
 
 export interface GenericGridProps {
-  moduleId: number;
+  moduleId?: number;
+  slug?: string;
+  title?: string;
   columns: ColumnConfig[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   modalComponent: ComponentType<any>;
@@ -167,7 +170,6 @@ export interface GenericGridProps {
 // ---------------------------------------------------------------------------
 
 function formatDate(value: unknown): string {
-  console.log('formatDate input:', value);
   if (!value) return '—';
   const str = value as string;
   // Data pura YYYY-MM-DD — parsear manualmente sem new Date (evita problemas de timezone)
@@ -205,9 +207,10 @@ function parseWidthPx(width?: string): number | undefined {
 
 function DragHandle({ rowId }: { rowId: string }) {
   const { attributes, listeners, isDragging } = useSortable({ id: rowId });
+  const [tooltipOpen, setTooltipOpen] = useState(false);
   return (
     <TooltipProvider>
-      <Tooltip open={isDragging ? false : undefined}>
+      <Tooltip open={isDragging ? false : tooltipOpen} onOpenChange={setTooltipOpen}>
         <TooltipTrigger asChild>
           <span
             className="flex items-center justify-center cursor-grab active:cursor-grabbing text-muted-foreground outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0"
@@ -322,7 +325,8 @@ function renderCellByType(value: unknown, col: ColumnConfig, record: AnyRecord, 
 // ---------------------------------------------------------------------------
 
 function GroupedDndRow({ row }: { row: Row<AnyRecord> }) {
-  const { transform, setNodeRef, isDragging } = useSortable({ id: row.id });
+  const recordId = String(row.original.id);
+  const { transform, setNodeRef, isDragging } = useSortable({ id: recordId });
   const style: CSSProperties = {
     transform: CSS.Transform.toString(transform),
     opacity: isDragging ? 0 : 1,
@@ -339,6 +343,20 @@ function GroupedDndRow({ row }: { row: Row<AnyRecord> }) {
   );
 }
 
+function GroupedDndOverlay({
+  renderDragOverlay,
+}: {
+  renderDragOverlay?: (activeId: UniqueIdentifier | null) => React.ReactNode;
+}) {
+  const { active } = useDndContext();
+  return createPortal(
+    <DragOverlay dropAnimation={null}>
+      {active && renderDragOverlay ? renderDragOverlay(active.id) : null}
+    </DragOverlay>,
+    document.body,
+  );
+}
+
 function GroupedDndSection({
   rows,
   onDragEnd,
@@ -349,49 +367,36 @@ function GroupedDndSection({
   renderDragOverlay?: (activeId: UniqueIdentifier | null) => React.ReactNode;
 }) {
   const id = useId();
-  const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
-  const rowIds = useMemo(() => rows.map((r) => r.id), [rows]);
+  const items = useMemo(
+    () => rows.map((r) => String(r.original.id)),
+    [rows],
+  );
   const sensors = useSensors(
     useSensor(MouseSensor),
     useSensor(TouchSensor),
     useSensor(KeyboardSensor),
   );
-  const handleDragStart = useCallback((event: DragStartEvent) => {
-    setActiveId(event.active.id);
-  }, []);
-  const handleDragEnd = useCallback(
-    (event: DragEndEvent) => {
-      const { active, over } = event;
-      setActiveId(null);
-      if (over && active.id !== over.id) {
-        onDragEnd(String(active.id), String(over.id));
-      }
-      (document.activeElement as HTMLElement)?.blur();
-    },
-    [onDragEnd],
-  );
-  const handleDragCancel = useCallback(() => {
-    setActiveId(null);
-    (document.activeElement as HTMLElement)?.blur();
-  }, []);
   return (
     <DndContext
       id={id}
       collisionDetection={closestCenter}
       modifiers={[restrictToVerticalAxis]}
       sensors={sensors}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-      onDragCancel={handleDragCancel}
+      onDragEnd={(event) => {
+        const { active, over } = event;
+        if (!over || active.id === over.id) return;
+        // Fire-and-forget — não usar await aqui
+        onDragEnd(String(active.id), String(over.id));
+      }}
+      onDragCancel={() => (document.activeElement as HTMLElement)?.blur()}
+      accessibility={{ container: document.body }}
     >
-      <SortableContext items={rowIds} strategy={verticalListSortingStrategy}>
+      <SortableContext items={items} strategy={verticalListSortingStrategy}>
         {rows.map((row) => (
-          <GroupedDndRow row={row} key={row.id} />
+          <GroupedDndRow row={row} key={String(row.original.id)} />
         ))}
       </SortableContext>
-      <DragOverlay dropAnimation={null}>
-        {renderDragOverlay ? renderDragOverlay(activeId) : null}
-      </DragOverlay>
+      <GroupedDndOverlay renderDragOverlay={renderDragOverlay} />
     </DndContext>
   );
 }
@@ -497,7 +502,7 @@ function GroupedTable({
                   </td>
                 </tr>
                 {showDrag && onGroupedDragEnd ? (
-                  <GroupedDndSection rows={groupRows} onDragEnd={onGroupedDragEnd} renderDragOverlay={renderDragOverlay} />
+                  <GroupedDndSection key={key} rows={groupRows} onDragEnd={onGroupedDragEnd} renderDragOverlay={renderDragOverlay} />
                 ) : (
                   groupRows.map((row) => (
                     <DataGridTableBodyRow row={row} key={row.id}>
@@ -526,6 +531,8 @@ function GroupedTable({
 
 export function GenericGrid({
   moduleId,
+  slug: slugProp,
+  title: titleProp,
   columns: columnConfigs,
   modalComponent,
   modalSize = 'm',
@@ -602,23 +609,28 @@ export function GenericGrid({
   const [modalMode, setModalMode]           = useState<RowMode>('create');
   const [selectedRecord, setSelectedRecord] = useState<AnyRecord | null>(null);
 
+  // Bypass: slug/title podem vir direto como props (sem buscar moduleConfig via API)
+  const resolvedSlug  = slugProp ?? moduleConfig?.slug ?? null;
+  const resolvedTitle = titleProp ?? moduleConfig?.name ?? '...';
+
   // ---------------------------------------------------------------------------
   // Module config fetch
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
+    if (slugProp) return; // bypass: slug fornecido via prop, não precisa buscar
     if (!moduleId || !tenant) return;
     apiGet<ModuleConfig>(`/v1/${tenant}/modules/${moduleId}`)
       .then(setModuleConfig)
       .catch((err) => console.error('[GenericGrid] Erro ao buscar config do módulo:', err));
-  }, [moduleId, tenant]);
+  }, [slugProp, moduleId, tenant]);
 
   // ---------------------------------------------------------------------------
   // Data fetch
   // ---------------------------------------------------------------------------
 
   const fetchData = useCallback(async () => {
-    if (!moduleConfig) return;
+    if (!resolvedSlug) return;
     setIsLoading(true);
     try {
       const { pageIndex, pageSize } = pagination;
@@ -632,7 +644,7 @@ export function GenericGrid({
         ...activeFilters,
       });
       const res = await apiGet<{ data: AnyRecord[]; meta: { total: number } }>(
-        `/v1/${tenant}/${moduleConfig.slug}?${params.toString()}`,
+        `/v1/${tenant}/${resolvedSlug}?${params.toString()}`,
       );
       setData(res.data);
       setTotal(res.meta.total);
@@ -642,7 +654,7 @@ export function GenericGrid({
     } finally {
       setIsLoading(false);
     }
-  }, [moduleConfig, pagination, sorting, tenant, activeFilters]);
+  }, [resolvedSlug, pagination, sorting, tenant, activeFilters]);
 
   useEffect(() => {
     fetchData();
@@ -678,49 +690,15 @@ export function GenericGrid({
   const handleDragEnd = useCallback(
     async (event: DragEndEvent) => {
       const { active, over } = event;
-      if (!over || active.id === over.id || !moduleConfig) return;
+      if (!over || active.id === over.id || !resolvedSlug) return;
 
-      const oldIndex = parseInt(active.id as string);
-      const newIndex = parseInt(over.id as string);
-      const newData  = arrayMove(data, oldIndex, newIndex);
-
-      const baseOrder        = total - pagination.pageIndex * pagination.pageSize;
-      const newDataWithOrders = newData.map((item, i) => ({ ...item, order: baseOrder - i } as AnyRecord));
-
-      // Optimistic update
-      setData(newDataWithOrders);
-
-      const orderMap    = new Map(data.map((item) => [item.id as number, (item.order as number) ?? 0]));
-      const changedItems = newDataWithOrders.filter(
-        (item) => (item.order as number) !== orderMap.get(item.id as number),
-      );
-
-      try {
-        await Promise.all(
-          changedItems.map((item) =>
-            apiPut<unknown>(`/v1/${tenant}/${moduleConfig.slug}/${item.id as number}`, item),
-          ),
-        );
-      } catch (err) {
-        console.error('[GenericGrid] Erro ao reordenar:', err);
-        fetchData();
-      }
-    },
-    [data, total, pagination, fetchData, tenant, moduleConfig],
-  );
-
-  const handleGroupedDragEnd = useCallback(
-    async (activeId: string, overId: string) => {
-      if (!moduleConfig) return;
-      const oldIndex = parseInt(activeId);
-      const newIndex = parseInt(overId);
-      if (isNaN(oldIndex) || isNaN(newIndex)) return;
-
+      const oldIndex = data.findIndex((d) => String(d.id) === String(active.id));
+      const newIndex = data.findIndex((d) => String(d.id) === String(over.id));
+      if (oldIndex === -1 || newIndex === -1) return;
       const newData = arrayMove(data, oldIndex, newIndex);
+
       const baseOrder = total - pagination.pageIndex * pagination.pageSize;
       const newDataWithOrders = newData.map((item, i) => ({ ...item, order: baseOrder - i } as AnyRecord));
-
-      setData(newDataWithOrders);
 
       const orderMap = new Map(data.map((item) => [item.id as number, (item.order as number) ?? 0]));
       const changedItems = newDataWithOrders.filter(
@@ -730,15 +708,47 @@ export function GenericGrid({
       try {
         await Promise.all(
           changedItems.map((item) =>
-            apiPut<unknown>(`/v1/${tenant}/${moduleConfig.slug}/${item.id as number}`, item),
+            apiPut<unknown>(`/v1/${tenant}/${resolvedSlug}/${item.id as number}`, item),
+          ),
+        );
+      } catch (err) {
+        console.error('[GenericGrid] Erro ao reordenar:', err);
+      } finally {
+        fetchData();
+      }
+    },
+    [data, total, pagination, fetchData, tenant, resolvedSlug],
+  );
+
+  const handleGroupedDragEnd = useCallback(
+    async (activeId: string, overId: string) => {
+      if (!resolvedSlug) return;
+      const oldIndex = data.findIndex((d) => String(d.id) === activeId);
+      const newIndex = data.findIndex((d) => String(d.id) === overId);
+      if (oldIndex === -1 || newIndex === -1) return;
+
+      const newData = arrayMove(data, oldIndex, newIndex);
+      const baseOrder = total - pagination.pageIndex * pagination.pageSize;
+      const newDataWithOrders = newData.map((item, i) => ({ ...item, order: baseOrder - i } as AnyRecord));
+
+      const orderMap = new Map(data.map((item) => [item.id as number, (item.order as number) ?? 0]));
+      const changedItems = newDataWithOrders.filter(
+        (item) => (item.order as number) !== orderMap.get(item.id as number),
+      );
+
+      try {
+        await Promise.all(
+          changedItems.map((item) =>
+            apiPut<unknown>(`/v1/${tenant}/${resolvedSlug}/${item.id as number}`, item),
           ),
         );
       } catch (err) {
         console.error('[GenericGrid] Erro ao reordenar em grupo:', err);
+      } finally {
         fetchData();
       }
     },
-    [data, total, pagination, fetchData, tenant, moduleConfig],
+    [data, total, pagination, fetchData, tenant, resolvedSlug],
   );
 
   // ---------------------------------------------------------------------------
@@ -747,13 +757,13 @@ export function GenericGrid({
 
   const handleBulkActive = useCallback(
     async (activeValue: boolean) => {
-      if (!moduleConfig) return;
+      if (!resolvedSlug) return;
       const selectedIndices = Object.keys(rowSelection).map(Number);
       const selectedItems   = data.filter((_, i) => selectedIndices.includes(i));
       try {
         await Promise.all(
           selectedItems.map((item) =>
-            apiPut<unknown>(`/v1/${tenant}/${moduleConfig.slug}/${item.id as number}`, {
+            apiPut<unknown>(`/v1/${tenant}/${resolvedSlug}/${item.id as number}`, {
               ...item,
               active: activeValue,
             }),
@@ -766,7 +776,7 @@ export function GenericGrid({
         fetchData();
       }
     },
-    [moduleConfig, rowSelection, data, tenant, fetchData],
+    [resolvedSlug, rowSelection, data, tenant, fetchData],
   );
 
   // ---------------------------------------------------------------------------
@@ -823,7 +833,7 @@ export function GenericGrid({
       cols.push({
         id: 'drag',
         header: () => null,
-        cell: ({ row }) => <DragHandle rowId={row.id} />,
+        cell: ({ row }) => <DragHandle rowId={String(row.original.id)} />,
         meta: { style: { width: '5%' }, skeleton: <span className="block w-4 h-4" /> },
       });
     }
@@ -970,15 +980,35 @@ export function GenericGrid({
   // ---------------------------------------------------------------------------
 
   const dataIds = useMemo<UniqueIdentifier[]>(
-    () => table.getRowModel().rows.map((row) => row.id),
+    () => table.getRowModel().rows.map((row) => String(row.original.id)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [data],
   );
 
+  // Overlay para modo não-agrupado: activeId = database record id
   const renderDragOverlay = useCallback(
     (activeId: UniqueIdentifier | null) => {
       if (activeId === null) return null;
-      const item = data[parseInt(activeId as string)];
+      const item = data.find((d) => String(d.id) === String(activeId));
+      if (!item) return null;
+      const col0 = columnConfigs[0];
+      const col1 = columnConfigs[1];
+      return (
+        <div className="flex items-center gap-2 bg-background border rounded-md shadow-xl px-3 py-2 text-sm cursor-grabbing">
+          <GripVertical className="size-4 text-muted-foreground shrink-0" />
+          {col0 && <span className="font-medium">{String(item[col0.key] ?? '')}</span>}
+          {col1 && <span className="text-muted-foreground text-xs">{String(item[col1.key] ?? '')}</span>}
+        </div>
+      );
+    },
+    [data, columnConfigs],
+  );
+
+  // Overlay para modo agrupado: activeId = database record id
+  const renderGroupedDragOverlay = useCallback(
+    (activeId: UniqueIdentifier | null) => {
+      if (activeId === null) return null;
+      const item = data.find((d) => String(d.id) === String(activeId));
       if (!item) return null;
       const col0 = columnConfigs[0];
       const col1 = columnConfigs[1];
@@ -1011,7 +1041,7 @@ export function GenericGrid({
         <div className="flex items-center justify-between mb-5">
           <h1 className="text-xl font-semibold flex items-center gap-2">
             {Icon && <Icon className="size-6" />}
-            {moduleConfig?.name ?? '...'}
+            {resolvedTitle}
           </h1>
           <div className="flex items-center gap-2">
             {showBtnSearch && (
@@ -1064,7 +1094,7 @@ export function GenericGrid({
                 groupByLevel1Labels={groupByLevel1Labels}
                 showDrag={effectiveShowDrag}
                 onGroupedDragEnd={handleGroupedDragEnd}
-                renderDragOverlay={renderDragOverlay}
+                renderDragOverlay={renderGroupedDragOverlay}
               />
             ) : (
               <DataGridTable />
@@ -1103,6 +1133,7 @@ export function GenericGrid({
         onOpenChange={handleModalOpenChange}
         mode={modalMode}
         moduleId={moduleId}
+        slug={slugProp}
         record={selectedRecord}
         onSuccess={fetchData}
         size={modalSize}

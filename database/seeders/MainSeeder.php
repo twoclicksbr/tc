@@ -10,13 +10,13 @@ class MainSeeder extends Seeder
     public function run(): void
     {
         Module::on('main')->firstOrCreate(
-            ['slug' => 'tenants'],
+            ['slug' => 'modules'],
             [
-                'name'        => 'Empresas',
+                'name'        => 'Módulos',
                 'type'        => 'module',
-                'model'       => 'Tenant',
-                'request'     => 'TenantRequest',
-                'controller'  => 'System\\TenantController',
+                'model'       => 'Module',
+                'request'     => 'ModuleRequest',
+                'controller'  => 'System\\ModuleController',
                 'owner_level' => 'master',
                 'owner_id'    => 0,
                 'order'       => 1,
@@ -25,13 +25,13 @@ class MainSeeder extends Seeder
         );
 
         Module::on('main')->firstOrCreate(
-            ['slug' => 'modules'],
+            ['slug' => 'module-fields'],
             [
-                'name'        => 'Módulos',
-                'type'        => 'module',
-                'model'       => 'Module',
-                'request'     => 'ModuleRequest',
-                'controller'  => 'System\\ModuleController',
+                'name'        => 'Campos do Módulo',
+                'type'        => 'submodule',
+                'model'       => 'ModuleField',
+                'request'     => 'ModuleFieldRequest',
+                'controller'  => null,
                 'owner_level' => 'master',
                 'owner_id'    => 0,
                 'order'       => 2,
@@ -50,36 +50,6 @@ class MainSeeder extends Seeder
                 'owner_level' => 'master',
                 'owner_id'    => 0,
                 'order'       => 3,
-                'active'      => true,
-            ]
-        );
-
-        Module::on('main')->firstOrCreate(
-            ['slug' => 'pessoas'],
-            [
-                'name'        => 'Pessoas',
-                'type'        => 'module',
-                'model'       => 'Person',
-                'request'     => 'PersonRequest',
-                'controller'  => null,
-                'owner_level' => 'master',
-                'owner_id'    => 0,
-                'order'       => 4,
-                'active'      => true,
-            ]
-        );
-
-        Module::on('main')->firstOrCreate(
-            ['slug' => 'module-fields'],
-            [
-                'name'        => 'Campos do Módulo',
-                'type'        => 'submodule',
-                'model'       => 'ModuleField',
-                'request'     => 'ModuleFieldRequest',
-                'controller'  => null,
-                'owner_level' => 'master',
-                'owner_id'    => 0,
-                'order'       => 5,
                 'active'      => true,
             ]
         );

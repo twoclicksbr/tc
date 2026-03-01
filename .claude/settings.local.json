@@ -73,7 +73,17 @@
       "Bash(git -C /c/Herd/smartclick360 show HEAD:resources/js/)",
       "Bash(git -C /c/Herd/smartclick360 ls-tree HEAD --name-only)",
       "Bash(git -C /c/Herd/smartclick360 show 94eaff6 --stat)",
-      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(list\\(d.keys\\(\\)\\)\\)\")"
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(list\\(d.keys\\(\\)\\)\\)\")",
+      "Bash(psql -U postgres -c \"SELECT pg_terminate_backend\\(pid\\) FROM pg_stat_activity WHERE datname = ''tc_main'' AND pid <> pg_backend_pid\\(\\);\")",
+      "Bash(PGPASSWORD=postgres \"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -c \"SELECT pg_terminate_backend\\(pid\\) FROM pg_stat_activity WHERE datname = ''tc_main'' AND pid <> pg_backend_pid\\(\\);\")",
+      "Bash(PGPASSWORD=\"Millena2012@\" \"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -c \"SELECT pg_terminate_backend\\(pid\\) FROM pg_stat_activity WHERE datname = ''tc_main'' AND pid <> pg_backend_pid\\(\\);\")",
+      "Bash(PGPASSWORD=\"Millena2012@\" \"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -c \"DROP DATABASE IF EXISTS tc_main;\")",
+      "Bash(PGPASSWORD=\"Millena2012@\" \"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -c \"CREATE DATABASE tc_main OWNER postgres;\")",
+      "Bash(PGPASSWORD=\"Millena2012@\" \"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d tc_main -c \":*)",
+      "Bash(\"/c/Users/alexa/.config/herd/bin/php84/php.exe\" artisan migrate:fresh --database=main --path=database/migrations/main)",
+      "Bash(\"/c/Users/alexa/.config/herd/bin/php84/php.exe\" artisan db:seed --database=main)",
+      "Bash(PGPASSWORD=\"Millena2012@\" \"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d tc_main -c \"DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA sand; CREATE SCHEMA prod; CREATE SCHEMA log;\")",
+      "Bash(\"/c/Users/alexa/.config/herd/bin/php84/php.exe\" artisan tinker --execute=\"echo json_encode\\(\\\\App\\\\Models\\\\Module::on\\(''main''\\)->where\\(''slug'', ''module-fields''\\)->first\\(\\)\\);\")"
     ]
   }
 }

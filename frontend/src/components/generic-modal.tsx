@@ -41,8 +41,12 @@ export interface GenericModalProps {
   // Tamanho: p = max-w-sm, m = max-w-lg (default), g = max-w-4xl
   size?: 'p' | 'm' | 'g';
 
-  // Módulo — busca name_url + after_* via API
-  moduleId: number;
+  // Módulo — busca slug + after_* via API (ou recebe direto como props para bypass)
+  moduleId?: number;
+  slug?: string;
+  afterStore?: AfterAction;
+  afterUpdate?: AfterAction;
+  afterRestore?: AfterAction;
 
   // Registro selecionado (qualquer módulo)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -50,6 +54,10 @@ export interface GenericModalProps {
 
   // Callback chamado após ação bem-sucedida (ex: recarregar grid)
   onSuccess?: () => void;
+
+  // Callback chamado com o record retornado pela API após create/edit/restore bem-sucedido
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onSaveSuccess?: (record: Record<string, any>) => void;
 
   // Coleta de dados do formulário externo.
   // GenericModal chama isso antes de enviar. Retornar null aborta (validação falhou no pai).
@@ -111,8 +119,13 @@ export function GenericModal({
   mode,
   size = 'm',
   moduleId,
+  slug: slugProp,
+  afterStore: afterStoreProp,
+  afterUpdate: afterUpdateProp,
+  afterRestore: afterRestoreProp,
   record = null,
   onSuccess,
+  onSaveSuccess,
   onGetData,
   onErrors,
   btnCancel    = true,
@@ -149,13 +162,14 @@ export function GenericModal({
     }
   }, [open, mode, record]);
 
-  // Busca config do módulo uma vez por moduleId
+  // Busca config do módulo uma vez por moduleId (ignorado quando slug vem via prop)
   useEffect(() => {
+    if (slugProp) return; // bypass: slug fornecido via prop
     if (!moduleId || !tenant) return;
     apiGet<ModuleConfig>(`/v1/${tenant}/modules/${moduleId}`)
       .then(setModuleConfig)
       .catch((err) => console.error('[GenericModal] Erro ao buscar config do módulo:', err));
-  }, [moduleId, tenant]);
+  }, [slugProp, moduleId, tenant]);
 
   // ---------------------------------------------------------------------------
   // Derivações
@@ -169,7 +183,8 @@ export function GenericModal({
   // ---------------------------------------------------------------------------
 
   async function handleSave() {
-    if (!moduleConfig) return;
+    const resolvedSlug = slugProp ?? moduleConfig?.slug;
+    if (!resolvedSlug) return;
 
     // Coleta dados do formulário externo; null = validação falhou
     const formData = onGetData ? onGetData() : {};
@@ -178,7 +193,7 @@ export function GenericModal({
     setSaving(true);
     try {
       const body   = { ...formData, active };
-      const baseUrl = `/v1/${tenant}/${moduleConfig.slug}`;
+      const baseUrl = `/v1/${tenant}/${resolvedSlug}`;
       const id      = internalRecord?.id as number | undefined;
 
       let path:   string;
@@ -201,13 +216,12 @@ export function GenericModal({
 
       if (res.ok) {
         const json = await res.json().catch(() => ({}));
+        onSaveSuccess?.(json);
 
-        const afterKey =
-          internalMode === 'create'  ? 'after_store'   :
-          internalMode === 'edit'    ? 'after_update'  :
-                                       'after_restore';
-
-        const afterAction: AfterAction = moduleConfig[afterKey] ?? 'index';
+        const afterAction: AfterAction =
+          internalMode === 'create'  ? (afterStoreProp   ?? moduleConfig?.after_store   ?? 'index') :
+          internalMode === 'edit'    ? (afterUpdateProp  ?? moduleConfig?.after_update  ?? 'index') :
+                                       (afterRestoreProp ?? moduleConfig?.after_restore ?? 'index');
 
         switch (afterAction) {
           case 'index':
@@ -246,11 +260,12 @@ export function GenericModal({
   }
 
   async function handleDelete() {
-    if (!moduleConfig || !internalRecord) return;
+    const resolvedSlug = slugProp ?? moduleConfig?.slug;
+    if (!resolvedSlug || !internalRecord) return;
     setSaving(true);
     try {
       const res = await apiFetch(
-        `/v1/${tenant}/${moduleConfig.slug}/${internalRecord.id as number}`,
+        `/v1/${tenant}/${resolvedSlug}/${internalRecord.id as number}`,
         { method: 'DELETE' },
       );
       if (res.ok) {

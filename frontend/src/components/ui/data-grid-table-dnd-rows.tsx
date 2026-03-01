@@ -48,7 +48,7 @@ function DataGridTableDndRowHandle({ rowId }: { rowId: string }) {
 
 function DataGridTableDndRow<TData>({ row }: { row: Row<TData> }) {
   const { transform, setNodeRef, isDragging } = useSortable({
-    id: row.id,
+    id: String((row.original as Record<string, unknown>).id),
   });
 
   const style: CSSProperties = {
@@ -100,8 +100,8 @@ function DataGridTableDndRows<TData>({
   const internalHandleDragEnd = useCallback(
     (event: DragEndEvent) => {
       setActiveId(null);
-      (document.activeElement as HTMLElement)?.blur();
-      handleDragEnd(event);
+      // Fire-and-forget — não usar await aqui
+      void handleDragEnd(event);
     },
     [handleDragEnd],
   );

@@ -12,19 +12,19 @@ class AdminSeeder extends Seeder
     public function run(): void
     {
         $person = Person::firstOrCreate(
-            ['name' => 'Admin'],
+            ['name' => 'Alex Twoclicks Technology'],
             [
-                'birth_date' => null,
+                'birth_date' => "1985-05-09",
                 'order'      => 1,
                 'active'     => true,
             ]
         );
 
         User::firstOrCreate(
-            ['email' => 'admin@admin.com'],
+            ['email' => 'alex@twoclicks.com.br'],
             [
                 'person_id' => $person->id,
-                'password'  => Hash::make('admin123'),
+                'password'  => Hash::make('Alex1985@'),
                 'active'    => true,
             ]
         );

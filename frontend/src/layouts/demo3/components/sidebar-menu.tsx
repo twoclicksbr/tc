@@ -1,19 +1,9 @@
-import {
-  ArrowDownCircle,
-  ArrowUpCircle,
-  BarChart3,
-  Building2,
-  LayoutGrid,
-  Layers,
-  Package,
-  Settings,
-  ShoppingCart,
-  TrendingUp,
-  Users,
-} from 'lucide-react';
+import * as LucideIcons from 'lucide-react';
+import { CircleDot, LayoutDashboard } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { getUrlTenantSlug } from '@/lib/tenant';
 import { usePlatform } from '@/providers/platform-provider';
+import { useModules } from '@/providers/modules-provider';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
@@ -23,39 +13,58 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 
-export interface Item {
-  icon: React.ComponentType<{ className?: string }>;
-  path: string;
-  title: string;
+function DynamicIcon({ name, className }: { name: string | null; className?: string }) {
+  if (name) {
+    const Icon = (LucideIcons as unknown as Record<string, React.ComponentType<{ className?: string }>>)[name];
+    if (Icon) return <Icon className={className} />;
+  }
+  return <CircleDot className={className} />;
 }
 
 export function SidebarMenu() {
   const { pathname } = useLocation();
-
   const isAdmin = getUrlTenantSlug() === 'admin';
   const { selectedPlatform } = usePlatform();
+  const { modules } = useModules();
 
-  const items: Item[] = [
-    ...(isAdmin && !selectedPlatform ? [{ icon: Layers,    path: '/platforms', title: 'Plataformas' }] : []),
-    ...(isAdmin ? [{ icon: Building2, path: '/tenants',   title: 'Empresas' }] : []),
-    { icon: LayoutGrid,       path: '/modules',      title: 'Módulos' },
-    { icon: Users,            path: '/pessoas',      title: 'Pessoas' },
-    { icon: Package,          path: '/produtos',     title: 'Produtos' },
-    { icon: ShoppingCart,     path: '/compras',      title: 'Compras' },
-    { icon: TrendingUp,       path: '/vendas',       title: 'Vendas' },
-    { icon: BarChart3,        path: '/financeiro',   title: 'Financeiro' },
-    { icon: ArrowUpCircle,    path: '/pagar',        title: 'Pagar' },
-    { icon: ArrowDownCircle,  path: '/receber',      title: 'Receber' },
-    { icon: Settings,         path: '/configuracao', title: 'Configuração' },
-  ];
+  const dashboardPath = '/dashboard';
+  const isDashboardActive = pathname === dashboardPath || pathname.startsWith(dashboardPath + '/');
 
   return (
     <TooltipProvider>
       <div className="flex flex-col grow items-center py-3.5 lg:py-0 gap-2.5">
-        {items.map((item, index) => {
-          const isActive = pathname === item.path || pathname.startsWith(item.path + '/');
+
+        {/* Dashboard — hardcoded, sempre visível */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              shape="circle"
+              mode="icon"
+              {...(isDashboardActive ? { 'data-state': 'open' } : {})}
+              className={cn(
+                'data-[state=open]:bg-background data-[state=open]:border data-[state=open]:border-input data-[state=open]:text-primary',
+                'hover:bg-background hover:border hover:border-input hover:text-primary',
+              )}
+            >
+              <Link to={dashboardPath}>
+                <LayoutDashboard className="size-4.5!" />
+              </Link>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="right">Dashboard</TooltipContent>
+        </Tooltip>
+
+        {/* Itens dinâmicos da tabela modules */}
+        {modules.map((mod) => {
+          if (mod.slug === 'platforms' && !(isAdmin && !selectedPlatform)) return null;
+          if (mod.slug === 'tenants' && !isAdmin) return null;
+
+          const path = `/${mod.slug}`;
+          const isActive = pathname === path || pathname.startsWith(path + '/');
+
           return (
-            <Tooltip key={index}>
+            <Tooltip key={mod.id}>
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
@@ -67,15 +76,16 @@ export function SidebarMenu() {
                     'hover:bg-background hover:border hover:border-input hover:text-primary',
                   )}
                 >
-                  <Link to={item.path}>
-                    <item.icon className="size-4.5!" />
+                  <Link to={path}>
+                    <DynamicIcon name={mod.icon} className="size-4.5!" />
                   </Link>
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">{item.title}</TooltipContent>
+              <TooltipContent side="right">{mod.name}</TooltipContent>
             </Tooltip>
           );
         })}
+
       </div>
     </TooltipProvider>
   );

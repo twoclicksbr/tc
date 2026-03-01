@@ -403,12 +403,13 @@ Garante retorno 401 JSON para requisições não autenticadas. Sem isso, o Larav
 
 | Observer | Gatilho | O que faz |
 |----------|---------|-----------|
+| `ModuleObserver` | `creating` | (a definir — arquivo criado, lógica pendente) |
 | `TenantObserver` | `creating` | Gera `slug`, `db_name` (slug com `_` no lugar de `-`), `sand_user/password`, `prod_user/password`, `log_user/password`, `expiration_date` |
 | `TenantObserver` | `created` | Chama `TenantDatabaseService::provision()` — provisiona banco do novo tenant |
 | `PlatformObserver` | `creating` | Gera `slug`, `db_name` = `{slug}_main`, `sand_user/password`, `prod_user/password`, `log_user/password`, `expiration_date` |
 | `PlatformObserver` | `created` | Chama `PlatformDatabaseService::provision()` — provisiona banco da nova platform |
 
-Registrados em `AppServiceProvider::boot()`.
+Registrados em `AppServiceProvider::boot()` — ordem: `ModuleObserver`, `TenantObserver`, `PlatformObserver`.
 
 ### Services (`app/Services/`)
 
@@ -422,9 +423,9 @@ Registrados em `AppServiceProvider::boot()`.
 | Seeder | O que faz |
 |--------|-----------|
 | `DatabaseSeeder` | Chama MainSeeder + TenantSeeder + AdminSeeder |
-| `MainSeeder` | Cria módulos em tc_main via `Module::on('main')->firstOrCreate` usando `slug` como chave: `tenants` (id=1, controller=`System\\TenantController`), `modules` (id=2, controller=`System\\ModuleController`), `platforms` (id=3, controller=`System\\PlatformController`), `pessoas` (id=4), `module-fields` (id=5, type=submodule, model=ModuleField, request=ModuleFieldRequest). **Não cria tenant/platform** — provisionamento é feito pelos Observers ao salvar. |
-| `TenantSeeder` | Cria módulos na conexão default (tenant) via `Module::firstOrCreate`: `modules` (id=1, controller=`System\\ModuleController`), `pessoas` (id=2), `users` (id=3), `module-fields` (id=4, type=submodule, model=ModuleField, request=ModuleFieldRequest) — todos com `owner_level=master`. |
-| `AdminSeeder` | Cria person 'Admin' + user admin@admin.com na conexão default atual (main ou tenant) |
+| `MainSeeder` | Cria exatamente 3 módulos em tc_main via `Module::on('main')->firstOrCreate` usando `slug` como chave: `modules` (order=1, controller=`System\\ModuleController`), `module-fields` (order=2, type=submodule, model=ModuleField, request=ModuleFieldRequest), `platforms` (order=3, controller=`System\\PlatformController`). **Não cria tenant/platform** — provisionamento é feito pelos Observers ao salvar. |
+| `TenantSeeder` | Todos os inserts comentados — vazio por enquanto. Módulos para tenant serão cadastrados via interface. |
+| `AdminSeeder` | Cria person 'Alex Twoclicks Technology' (birth_date=1985-05-09) + user alex@twoclicks.com.br (password: Alex1985@) na conexão default atual (main ou tenant) |
 
 **Comandos para rodar:**
 ```bash
@@ -535,6 +536,20 @@ Dropdown no header (visível apenas quando `getUrlTenantSlug() === 'admin'`) par
 - **Principal** — sem override (acessa `tc_main` diretamente)
 - **{nome da plataforma}** — seta override via `setPlatformOverride(slug)`, fazendo `getTenantSlug()` retornar o slug da plataforma selecionada
 
+### ModulesProvider (`frontend/src/providers/modules-provider.tsx`)
+
+Contexto React que carrega e expõe a lista de módulos `type=module` ativos do backend. Usado pelo `SidebarMenu` e outros componentes.
+
+| Valor/Função | Descrição |
+|---|---|
+| `modules` | Lista de módulos (`type=module`, `active=true`) — `id`, `slug`, `name`, `icon`, `type`, `owner_level`, `order` |
+| `loading` | Boolean de carregamento |
+| `refreshModules()` | Rebusca a lista — chamar após criar/editar/deletar módulo |
+
+Fetch: `GET /v1/{tenant}/modules?type=module&per_page=100&sort=order&direction=desc&active=true`. Recarrega automaticamente quando `selectedPlatform` muda.
+
+Hook: `useModules(): ModulesContextValue`
+
 ### PlatformProvider (`frontend/src/providers/platform-provider.tsx`)
 
 Contexto React que centraliza a lista de plataformas e a plataforma selecionada.
@@ -560,7 +575,7 @@ O menu horizontal do Demo3 tem um item fixo "Dashboard" como primeiro item (hard
 - Comercial → `/comercial`
 - Financeiro → `/financeiro`
 
-**Sidebar:** itens "Plataformas" (ícone `Layers`) e "Tenants" (ícone `Building2`) visíveis apenas quando `getUrlTenantSlug() === 'admin'`; "Módulos" (ícone `LayoutGrid`) sempre visível.
+**Sidebar (`sidebar-menu.tsx`):** dinâmico — consome `useModules()` do `ModulesProvider`. Item fixo "Dashboard" (ícone `LayoutDashboard`) sempre primeiro. Demais itens renderizados a partir dos módulos `type=module` retornados pela API, com ícone dinâmico via `DynamicIcon` (importa de `lucide-react` pelo nome; fallback `CircleDot`). Filtros de visibilidade: `platforms` visível só para admin sem plataforma selecionada; `tenants` visível só para admin.
 
 ### API Client (`frontend/src/lib/api.ts`)
 
@@ -618,7 +633,7 @@ server: { host: '0.0.0.0', port: 5173, https: false, allowedHosts: ['.tc.test', 
 **Componente genérico:** `frontend/src/components/generic-grid.tsx` (`GenericGrid`)
 
 - Recebe `moduleId` + `columns` (config declarativa) + `modalComponent` — tudo reutilizável
-- Busca `moduleConfig` via `GET /v1/{tenant}/modules/{moduleId}` (name, slug)
+- Busca `moduleConfig` via `GET /v1/{tenant}/modules/{moduleId}` (name, slug) — **ou bypass**: props `slug` e `title` fornecidos diretamente, dispensando o fetch de config
 - Colunas configuráveis: `key`, `label`, `sortable`, `type` (text/date/datetime/boolean/badge/currency), `alignHead`, `alignBody`, `meta` (`{ style?: CSSProperties }`) — largura via `meta: { style: { width: '12%' } }`
 - Prop `render` na `ColumnConfig` — renderer customizado: `(value, record, openModal) => ReactNode`; tem precedência sobre `type`
 - Colunas padrão: drag handle, checkbox, id, active (badge com label "Status" no thead) — toggle via props `showDrag`, `showCheckbox`, `showId`, `showActive`
@@ -672,10 +687,11 @@ server: { host: '0.0.0.0', port: 5173, https: false, allowedHosts: ['.tc.test', 
 - **DragOverlay** com `dropAnimation={null}`: ao arrastar, a linha original fica invisível (`opacity: 0`, mantendo espaço), e uma cópia visual segue o cursor — sem animação de retorno ao soltar
 - Sem `transition` CSS nas linhas — evita que as linhas animem de volta antes do React re-renderizar com a nova ordem
 - `blur()` chamado em `internalHandleDragEnd` e `internalHandleDragCancel` — elimina qualquer foco/highlight residual
-- `handleDragEnd`: recalcula `order` de todos os itens da página (`baseOrder = total - pageIndex * pageSize`, decrementa por posição)
-- **Update otimista**: `setData(newDataWithOrders)` antes das chamadas à API — sem reload visual
+- `handleDragEnd` e `handleGroupedDragEnd`: usam record ID (não índice de array) para lookup — `data.findIndex(d => String(d.id) === activeId)`. Recalcula `order` (`baseOrder = total - pageIndex * pageSize`, decrementa por posição). Sempre chama `fetchData()` no `finally` (sem update otimista).
+- `GroupedDndSection`: usa `String(row.original.id)` como ID dos itens sortable (não `row.id` do TanStack). `GroupedDndOverlay` usa `createPortal` para renderizar o `DragOverlay` no `document.body`.
+- Dois overlays distintos: `renderDragOverlay` (modo simples) e `renderGroupedDragOverlay` (modo agrupado) — ambos buscam item por record ID.
 - Só os itens cujo `order` mudou de fato são enviados via PUT (otimização)
-- Reverte para estado do banco via `fetchData()` em caso de erro
+- `DragHandle`: tooltip controlado por state local `tooltipOpen` para evitar glitch após soltar
 
 **Auto-order no backend (`ModuleController.store`):**
 - Se `order` não vier no payload: `order = MAX(order) + 1`
@@ -714,7 +730,10 @@ server: { host: '0.0.0.0', port: 5173, https: false, allowedHosts: ['.tc.test', 
 **Modos implementados:** `create`, `edit`, `show`, `delete`, `restore` ✅ — todos os 5 modos
 
 **Props da interface `GenericModalProps`:**
-- `moduleId` — busca `slug` + `after_*` via `GET /v1/{tenant}/modules/{id}`
+- `moduleId` — (opcional) busca `slug` + `after_*` via `GET /v1/{tenant}/modules/{id}`
+- `slug` — (opcional) bypass: slug direto, dispensa fetch de moduleConfig
+- `afterStore`, `afterUpdate`, `afterRestore` — (opcional) sobrescrevem os valores `after_*` do banco
+- `onSaveSuccess(record)` — callback chamado com o record retornado pela API após create/edit/restore bem-sucedido
 - `record` — registro atual (qualquer módulo)
 - `onGetData()` — coleta dados do formulário externo; retornar `null` aborta o save
 - `onErrors(errors)` — repassa erros 422 ao pai para exibir nos campos
@@ -814,7 +833,16 @@ Modal CRM para módulos. Suporta dois modos de renderização:
   - **Submódulos (col-6):** checkboxes de submódulos disponíveis (visível apenas quando type=module; busca `GET /v1/{tenant}/modules?type=submodule`)
 - **Descrições:** 6 Textareas 3×2 (index, show, store, update, delete, restore) — **card colapsável**; começa fechado (default); abre automaticamente se o record tiver algum campo de descrição preenchido; botão toggle com ChevronDown/ChevronRight
 
-**Tab Campos:** componente `ModuleFieldsTab` — CRUD inline de campos com drag-and-drop (@dnd-kit), formulário expansível por linha
+**Tab Campos:** componente `ModuleFieldsTab` — CRUD inline de campos com drag-and-drop (@dnd-kit), tabela com linha editável por campo. Interface: Nome, Tipo, Tamanho/FK, Nulo, Obrigatório, Único, Índice, Default, Ativo, Deletar. Campos padrão (`is_custom=false`) read-only e sem drag handle. Botão "+ Adicionar Campo" ao fundo.
+
+**Detalhes de `ModuleFieldsTab`:**
+- `FieldRow` inclui `owner_level` e `owner_id` (mapeados em `normalize`, enviados em todos PUT/POST)
+- `toApiPayload(field)` — converte `type` para minúsculo antes de enviar à API (validação backend exige lowercase)
+- `sortFields(fields)` — ordena: `id` primeiro → custom (por `order ASC`) → `order, active, created_at, updated_at, deleted_at` (ordem fixa ao final)
+- Fetch com `direction=asc`; aplicar `sortFields` após fetch, após insert e após DnD
+- Novo campo: POST com `type: 'string'`, `order: 1`, `is_custom: true`; inserido via `sortFields` (aparece logo após `id`)
+- DnD: redistribui os valores de `order` existentes dos campos custom entre as novas posições (ASC); campos padrão mantêm orders fixas
+- `FkModal` — dialog para configurar FK (`fk_table`, `fk_column`, `fk_label`); aparece quando tipo=`BIGINT`; busca módulos + campos via API
 
 **Scan de arquivos:** `GET /v1/{tenant}/modules/scan-files` — popula selects de Model, Request e Controller
 

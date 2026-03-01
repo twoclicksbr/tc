@@ -11,8 +11,8 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { apiGet } from '@/lib/api';
 
-// moduleId=1 — único módulo criado pelo MainSeeder em tc_main (firstOrCreate, sempre ID=1 após migrate:fresh)
-const MODULE_ID = 1;
+// moduleId=2 — módulo tenants criado pelo MainSeeder em tc_main (2º insert, sempre ID=2 após migrate:fresh)
+const MODULE_ID = 2;
 
 interface Platform {
   id: number;

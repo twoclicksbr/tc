@@ -8,9 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ModuleModal, ModuleInlineCtx, type ModuleForEdit } from './module-modal';
 import { ModuleShowModal } from './module-show-modal';
 
-// moduleId=2 — módulo modules criado pelo MainSeeder em tc_main (firstOrCreate, sempre ID=2 após migrate:fresh)
-const MODULE_ID = 2;
-
 export function ModulesPage() {
   const [selectedModule, setSelectedModule] = useState<ModuleForEdit | null>(null);
   const [gridKey, setGridKey] = useState(0);
@@ -95,7 +92,8 @@ export function ModulesPage() {
           record={selectedModule}
           onSuccess={handleSuccess}
           onBack={handleBack}
-          moduleId={MODULE_ID}
+          parentName="Módulos"
+          parentIcon="LayoutGrid"
         />
       </Container>
     );
@@ -105,7 +103,8 @@ export function ModulesPage() {
     <ModuleInlineCtx.Provider value={handleGoInline}>
       <GenericGrid
         key={gridKey}
-        moduleId={MODULE_ID}
+        slug="modules"
+        title="Módulos"
         icon={LayoutGrid}
         columns={[
           {

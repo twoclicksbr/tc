@@ -23,6 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { apiGet, apiPut } from '@/lib/api';
 import { getTenantSlug } from '@/lib/tenant';
+import { useModules } from '@/providers/modules-provider';
 import { type ModuleForEdit } from './module-modal';
 import { ModuleFieldsTab } from './module-fields-tab';
 
@@ -34,6 +35,8 @@ interface ModuleShowModalProps {
   inline?: boolean;
   onBack?: () => void;
   moduleId?: number;
+  parentName?: string;
+  parentIcon?: string;
 }
 
 type SlugStatus = 'idle' | 'checking' | 'available' | 'unavailable';
@@ -73,7 +76,8 @@ const OWNER_LABELS: Record<string, { label: string; variant: 'primary' | 'second
   tenant:   { label: 'Tenant',     variant: 'outline' },
 };
 
-export function ModuleShowModal({ open, onOpenChange, record, onSuccess, inline = false, onBack, moduleId }: ModuleShowModalProps) {
+export function ModuleShowModal({ open, onOpenChange, record, onSuccess, inline = false, onBack, moduleId, parentName, parentIcon }: ModuleShowModalProps) {
+  const { refreshModules } = useModules();
   const [name, setName]               = useState('');
   const [slug, setSlug]               = useState('');
   const [slugManual, setSlugManual]   = useState(false);
@@ -151,13 +155,18 @@ export function ModuleShowModal({ open, onOpenChange, record, onSuccess, inline 
     }
   }, [open, inline, record]);
 
-  // Busca moduleConfig do pai para breadcrumb (apenas no modo inline)
+  // Breadcrumb do pai: usa props diretas quando fornecidas, senão busca via API
   useEffect(() => {
-    if (!inline || !moduleId) return;
+    if (!inline) return;
+    if (parentName !== undefined) {
+      setParentModule({ name: parentName, icon: parentIcon ?? null });
+      return;
+    }
+    if (!moduleId) return;
     apiGet<{ name: string; icon: string | null }>(`/v1/${getTenantSlug()}/modules/${moduleId}`)
       .then((res) => setParentModule({ name: res.name, icon: res.icon }))
       .catch(() => {});
-  }, [inline, moduleId]);
+  }, [inline, moduleId, parentName, parentIcon]);
 
   // Scan de Models e Requests disponíveis
   useEffect(() => {
@@ -213,7 +222,8 @@ export function ModuleShowModal({ open, onOpenChange, record, onSuccess, inline 
       .toLowerCase()
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9-]+/g, '-');
+      .replace(/[^a-z0-9-]+/g, '-')
+      .replace(/-{2,}/g, '-');
     setSlug(sanitized);
     setErrors((prev) => { const e = { ...prev }; delete e.slug; return e; });
   }
@@ -253,6 +263,7 @@ export function ModuleShowModal({ open, onOpenChange, record, onSuccess, inline 
         active,
       });
       onSuccess();
+      refreshModules();
       if (!inline) onOpenChange(false);
     } catch (err: unknown) {
       const e = err as { status?: number; data?: { errors?: FieldErrors } };
@@ -807,7 +818,7 @@ export function ModuleShowModal({ open, onOpenChange, record, onSuccess, inline 
             {dadosTabContent}
           </TabsContent>
           <TabsContent value="campos" className="p-4">
-            <ModuleFieldsTab moduleId={record.id} active={activeTab === 'campos'} />
+            <ModuleFieldsTab moduleId={record.id} mode="edit" active={activeTab === 'campos'} />
           </TabsContent>
           <TabsContent value="grid" className="p-4">
             <p className="text-sm text-muted-foreground">Em desenvolvimento</p>
@@ -896,7 +907,7 @@ export function ModuleShowModal({ open, onOpenChange, record, onSuccess, inline 
                   {dadosTabContent}
                 </TabsContent>
                 <TabsContent value="campos" className="flex-1 overflow-y-auto p-6">
-                  <ModuleFieldsTab moduleId={record.id} active={activeTab === 'campos'} />
+                  <ModuleFieldsTab moduleId={record.id} mode="edit" active={activeTab === 'campos'} />
                 </TabsContent>
                 <TabsContent value="grid" className="flex-1 overflow-y-auto p-6">
                   <p className="text-sm text-muted-foreground">Em desenvolvimento</p>

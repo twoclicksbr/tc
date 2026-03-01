@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { GenericModal } from '@/components/generic-modal';
 import { apiGet } from '@/lib/api';
 import { getTenantSlug } from '@/lib/tenant';
+import { useModules } from '@/providers/modules-provider';
 import { ModuleShowModal } from './module-show-modal';
 
 // Context para interceptar show/edit e renderizar inline na página
@@ -51,7 +52,8 @@ interface ModuleModalProps {
   mode: 'create' | 'edit' | 'delete' | 'show' | 'restore';
   record: ModuleForEdit | null;
   onSuccess: () => void;
-  moduleId: number;
+  moduleId?: number;
+  slug?: string;
   size?: 'p' | 'm' | 'g';
 }
 
@@ -74,8 +76,14 @@ function toRenderMode(mode: ModuleModalProps['mode']): RenderMode {
   return mode === 'edit' || mode === 'show' ? 'show-crm' : (mode as RenderMode);
 }
 
-export function ModuleModal({ open, onOpenChange, mode, record, onSuccess, moduleId, size }: ModuleModalProps) {
+export function ModuleModal({ open, onOpenChange, mode, record, onSuccess, moduleId, slug: slugProp, size }: ModuleModalProps) {
   const goInline = useContext(ModuleInlineCtx);
+  const { refreshModules } = useModules();
+
+  function handleSuccess() {
+    onSuccess();
+    refreshModules();
+  }
   const [renderMode, setRenderMode] = useState<RenderMode>(toRenderMode(mode));
 
   const [name, setName]               = useState('');
@@ -156,7 +164,13 @@ export function ModuleModal({ open, onOpenChange, mode, record, onSuccess, modul
 
   function handleSlugChange(value: string) {
     setSlugManual(true);
-    setSlug(value);
+    const sanitized = value
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9-]+/g, '-')
+      .replace(/-{2,}/g, '-');
+    setSlug(sanitized);
     setErrors((prev) => { const e = { ...prev }; delete e.slug; return e; });
   }
 
@@ -184,7 +198,7 @@ export function ModuleModal({ open, onOpenChange, mode, record, onSuccess, modul
           open={open && renderMode === 'show-crm'}
           onOpenChange={(isOpen) => { if (!isOpen) onOpenChange(false); }}
           record={record}
-          onSuccess={() => { onSuccess(); onOpenChange(false); }}
+          onSuccess={() => { handleSuccess(); onOpenChange(false); }}
         />
       )}
 
@@ -196,8 +210,14 @@ export function ModuleModal({ open, onOpenChange, mode, record, onSuccess, modul
           mode={renderMode}
           size={size}
           moduleId={moduleId}
+          slug={slugProp}
           record={record}
-          onSuccess={onSuccess}
+          onSuccess={handleSuccess}
+          onSaveSuccess={(saved) => {
+            if (renderMode === 'create' && goInline) {
+              goInline(saved as ModuleForEdit);
+            }
+          }}
           onGetData={handleGetData}
           onErrors={handleErrors}
           saveDisabled={
@@ -283,19 +303,6 @@ export function ModuleModal({ open, onOpenChange, mode, record, onSuccess, modul
             )}
           </div>
 
-          {/* Ícone */}
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="module-icon">Ícone</Label>
-            <Input
-              id="module-icon"
-              value={icon}
-              onChange={(e) => setIcon(e.target.value)}
-              placeholder="nome-do-icone"
-            />
-            {errors.icon && (
-              <p className="text-sm text-destructive">{errors.icon[0]}</p>
-            )}
-          </div>
         </GenericModal>
       )}
     </>
