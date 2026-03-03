@@ -21,19 +21,35 @@
 Slash commands implementados como arquivos em `.claude/commands/`. Invocar com `/nome-do-comando`.
 
 ### /docs
-Sincroniza o CLAUDE.md e faz git commit/push. Único momento em que o git é executado.
+Branch management + sincroniza CLAUDE.md + commit/push. Gerencia branches de feature (criar, trocar, combinar), analisa diffs detalhadamente, atualiza CLAUDE.md seção por seção, commita e faz push na branch de feature.
 Arquivo: `.claude/commands/docs.md`
+
+### /merge
+Mergea branch de feature na main. Fetch, seleção de branch, merge, push da main, deleta branch (local + remota).
+Arquivo: `.claude/commands/merge.md`
+
+### /deploy
+Deploy no servidor sandbox. Merge main → sandbox, push, SSH: git pull + composer + migrate + cache no backend; git pull + npm install + build no frontend. Opção de seeders.
+Arquivo: `.claude/commands/deploy.md`
+
+### /merge-production
+Mergea sandbox na production. Merge, push.
+Arquivo: `.claude/commands/merge-production.md`
+
+### /deploy-production
+Deploy produção via SSH. Mesmo fluxo do /deploy mas branch production e diretório /var/www/tc/prod/.
+Arquivo: `.claude/commands/deploy-production.md`
 
 ### /vite
 Inicia o Vite dev server em background sem bloquear o terminal.
 Arquivo: `.claude/commands/vite.md`
 
 ### /vite-reset
-Fecha o Vite (se estiver rodando na porta 5173) e inicia novamente em background.
+Fecha o Vite (porta 5173) e reinicia em background.
 Arquivo: `.claude/commands/vite-reset.md`
 
 ### /vite-close
-Fecha o processo do Vite na porta 5173 e confirma o encerramento.
+Fecha o processo do Vite na porta 5173.
 Arquivo: `.claude/commands/vite-close.md`
 
 ## Regras do Chat (claude.ai)
