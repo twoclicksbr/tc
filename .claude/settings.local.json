@@ -29,7 +29,7 @@
       "Bash(PGPASSWORD=Millena2012@ \"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -h 127.0.0.1 -c \"SELECT 1;\")",
       "Bash(PHP=/c/Users/alexa/.config/herd/bin/php84/php.exe)",
       "Bash(__NEW_LINE_985be961f910ec63__ echo \"=== MAIN migrations ===\")",
-      "Bash($PHP artisan migrate --path=database/migrations/main --database=main --force)",
+      "Bash($PHP artisan migrate --path=database/migrations/tc_master --database=main --force)",
       "Bash(__NEW_LINE_985be961f910ec63__ echo \"\")",
       "Bash($PHP artisan migrate --path=database/migrations/tenant --database=tenant --force)",
       "Bash(PGPASSWORD=Millena2012@ \"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -h 127.0.0.1 -d sc360_main -c \"DROP TABLE IF EXISTS tenants CASCADE;\")",
@@ -39,7 +39,7 @@
       "Bash(PGPASSWORD=Millena2012@ \"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -h 127.0.0.1 -d sc360_main -c \"SELECT id, name, slug, db_name, expiration_date, active FROM tenants;\")",
       "Bash(__NEW_LINE_3472ff23c59ac11c__ echo \"\")",
       "Bash(__NEW_LINE_3472ff23c59ac11c__ PGPASSWORD=Millena2012@ \"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -h 127.0.0.1 -d sc360_valsul -c \"SELECT u.id, u.email, u.active, p.name FROM users u JOIN people p ON p.id = u.person_id;\")",
-      "Bash(\"/c/Users/alexa/.config/herd/bin/php84/php.exe\" artisan migrate:fresh --database=main --path=database/migrations/main --seed)",
+      "Bash(\"/c/Users/alexa/.config/herd/bin/php84/php.exe\" artisan migrate:fresh --database=main --path=database/migrations/tc_master --seed)",
       "Bash(\"/c/Users/alexa/.config/herd/bin/php84/php.exe\" artisan migrate:fresh --database=tenant --path=database/migrations/tenant --seed)",
       "Bash(\"/c/Users/alexa/.config/herd/bin/php84/php.exe\" artisan route:list --path=v1)",
       "Bash(php artisan route:list)",
@@ -57,9 +57,9 @@
       "Bash(grep -l \"Customer Details\" /c/Herd/themeforest/metronic/demo34/apps/customers/*.html)",
       "Bash(PGPASSWORD=Millena2012@ psql -h 127.0.0.1 -U postgres -d sc360_main -c \":*)",
       "Bash(PGPASSWORD=Millena2012@ \"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -h 127.0.0.1 -U postgres -d sc360_main -c \":*)",
-      "Bash(\"/c/Users/alexa/.config/herd/bin/php84/php.exe\" artisan migrate:fresh --database=main_sand --path=database/migrations/main --seed)",
-      "Bash(\"/c/Users/alexa/.config/herd/bin/php84/php.exe\" artisan migrate:fresh --database=main_prod --path=database/migrations/main --seed)",
-      "Bash(\"/c/Users/alexa/.config/herd/bin/php84/php.exe\" artisan migrate:fresh --database=main_prod --path=database/migrations/main)",
+      "Bash(\"/c/Users/alexa/.config/herd/bin/php84/php.exe\" artisan migrate:fresh --database=main_sand --path=database/migrations/tc_master --seed)",
+      "Bash(\"/c/Users/alexa/.config/herd/bin/php84/php.exe\" artisan migrate:fresh --database=main_prod --path=database/migrations/tc_master --seed)",
+      "Bash(\"/c/Users/alexa/.config/herd/bin/php84/php.exe\" artisan migrate:fresh --database=main_prod --path=database/migrations/tc_master)",
       "Bash(\"/c/Users/alexa/.config/herd/bin/php84/php.exe\" artisan migrate --database=main_log --path=database/migrations/log)",
       "Bash(\"/c/Users/alexa/.config/herd/bin/php84/php.exe\" artisan migrate:fresh --database=main_log --path=database/migrations/log)",
       "Bash(PGPASSWORD=Millena2012@ \"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -h 127.0.0.1 -d tc_main -c \"CREATE SCHEMA IF NOT EXISTS sand; CREATE SCHEMA IF NOT EXISTS prod; CREATE SCHEMA IF NOT EXISTS log;\")",
@@ -80,10 +80,13 @@
       "Bash(PGPASSWORD=\"Millena2012@\" \"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -c \"DROP DATABASE IF EXISTS tc_main;\")",
       "Bash(PGPASSWORD=\"Millena2012@\" \"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -c \"CREATE DATABASE tc_main OWNER postgres;\")",
       "Bash(PGPASSWORD=\"Millena2012@\" \"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d tc_main -c \":*)",
-      "Bash(\"/c/Users/alexa/.config/herd/bin/php84/php.exe\" artisan migrate:fresh --database=main --path=database/migrations/main)",
+      "Bash(\"/c/Users/alexa/.config/herd/bin/php84/php.exe\" artisan migrate:fresh --database=main --path=database/migrations/tc_master)",
       "Bash(\"/c/Users/alexa/.config/herd/bin/php84/php.exe\" artisan db:seed --database=main)",
       "Bash(PGPASSWORD=\"Millena2012@\" \"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d tc_main -c \"DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA sand; CREATE SCHEMA prod; CREATE SCHEMA log;\")",
-      "Bash(\"/c/Users/alexa/.config/herd/bin/php84/php.exe\" artisan tinker --execute=\"echo json_encode\\(\\\\App\\\\Models\\\\Module::on\\(''main''\\)->where\\(''slug'', ''module-fields''\\)->first\\(\\)\\);\")"
+      "Bash(\"/c/Users/alexa/.config/herd/bin/php84/php.exe\" artisan tinker --execute=\"echo json_encode\\(\\\\App\\\\Models\\\\Module::on\\(''main''\\)->where\\(''slug'', ''module-fields''\\)->first\\(\\)\\);\")",
+      "Bash(\"/c/Users/alexa/.config/herd/bin/php84/php.exe\" artisan tinker --execute=\"DB::connection\\(''tc_master''\\)->statement\\(''SET search_path TO sand,log''\\); echo App\\\\Models\\\\Platform::on\\(''tc_master''\\)->count\\(\\);\")",
+      "Bash(xargs grep -ln \"moduleId\\\\|GenericGrid\")",
+      "Bash(node -e \":*)"
     ]
   }
 }

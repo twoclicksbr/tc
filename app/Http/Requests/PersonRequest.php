@@ -15,7 +15,7 @@ class PersonRequest extends FormRequest
     {
         return [
             'name'       => ['required', 'string', 'max:255'],
-            'birth_date' => ['required', 'date'],
+            'birth_date' => ['nullable', 'date'],
             'order'      => ['nullable', 'integer', 'min:1'],
             'active'     => ['nullable', 'boolean'],
         ];

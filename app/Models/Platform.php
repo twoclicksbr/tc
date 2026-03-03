@@ -9,7 +9,7 @@ class Platform extends Model
 {
     use SoftDeletes;
 
-    protected $connection = 'main';
+    protected $connection = 'tc_master';
 
     protected $fillable = [
         'name',

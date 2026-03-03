@@ -11,9 +11,6 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { apiGet } from '@/lib/api';
 
-// moduleId=2 — módulo tenants criado pelo MainSeeder em tc_main (2º insert, sempre ID=2 após migrate:fresh)
-const MODULE_ID = 2;
-
 interface Platform {
   id: number;
   name: string;
@@ -87,7 +84,8 @@ export function TenantsPage() {
 
   return (
     <GenericGrid
-      moduleId={MODULE_ID}
+      slug="tenants"
+      title="Tenants"
       columns={[
         {
           key: 'name',

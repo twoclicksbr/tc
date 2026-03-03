@@ -11,9 +11,6 @@ import { Badge } from '@/components/ui/badge';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
-// moduleId=3 — módulo platforms criado pelo MainSeeder em tc_main (firstOrCreate, sempre ID=3 após migrate:fresh)
-const MODULE_ID = 3;
-
 export function PlatformsPage() {
   const { refreshPlatforms } = usePlatform();
   const [validityRange, setValidityRange] = useState<DateRange | undefined>(undefined);
@@ -78,7 +75,8 @@ export function PlatformsPage() {
 
   return (
     <GenericGrid
-      moduleId={MODULE_ID}
+      slug="platforms"
+      title="Plataformas"
       columns={[
         {
           key: 'name',

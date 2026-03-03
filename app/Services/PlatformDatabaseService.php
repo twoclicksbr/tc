@@ -28,45 +28,45 @@ class PlatformDatabaseService
 
         try {
             // 1. Criar banco de dados (só se ainda não existir)
-            $dbExists = DB::connection('main')->selectOne("SELECT 1 FROM pg_database WHERE datname = ?", [$dbName]);
+            $dbExists = DB::connection('tc_master')->selectOne("SELECT 1 FROM pg_database WHERE datname = ?", [$dbName]);
             if (!$dbExists) {
-                DB::connection('main')->statement("CREATE DATABASE \"{$dbName}\"");
+                DB::connection('tc_master')->statement("CREATE DATABASE \"{$dbName}\"");
                 $dbCreated = true;
             }
 
             // 2. Criar 3 users PostgreSQL (ou atualizar senha se já existirem)
-            $sandExists = DB::connection('main')->selectOne("SELECT 1 FROM pg_roles WHERE rolname = ?", [$sandUser]);
+            $sandExists = DB::connection('tc_master')->selectOne("SELECT 1 FROM pg_roles WHERE rolname = ?", [$sandUser]);
             if (!$sandExists) {
-                DB::connection('main')->statement("CREATE USER \"{$sandUser}\" WITH PASSWORD '{$sandPass}'");
+                DB::connection('tc_master')->statement("CREATE USER \"{$sandUser}\" WITH PASSWORD '{$sandPass}'");
                 $sandCreated = true;
             } else {
-                DB::connection('main')->statement("ALTER USER \"{$sandUser}\" WITH PASSWORD '{$sandPass}'");
+                DB::connection('tc_master')->statement("ALTER USER \"{$sandUser}\" WITH PASSWORD '{$sandPass}'");
             }
 
-            $prodExists = DB::connection('main')->selectOne("SELECT 1 FROM pg_roles WHERE rolname = ?", [$prodUser]);
+            $prodExists = DB::connection('tc_master')->selectOne("SELECT 1 FROM pg_roles WHERE rolname = ?", [$prodUser]);
             if (!$prodExists) {
-                DB::connection('main')->statement("CREATE USER \"{$prodUser}\" WITH PASSWORD '{$prodPass}'");
+                DB::connection('tc_master')->statement("CREATE USER \"{$prodUser}\" WITH PASSWORD '{$prodPass}'");
                 $prodCreated = true;
             } else {
-                DB::connection('main')->statement("ALTER USER \"{$prodUser}\" WITH PASSWORD '{$prodPass}'");
+                DB::connection('tc_master')->statement("ALTER USER \"{$prodUser}\" WITH PASSWORD '{$prodPass}'");
             }
 
-            $logExists = DB::connection('main')->selectOne("SELECT 1 FROM pg_roles WHERE rolname = ?", [$logUser]);
+            $logExists = DB::connection('tc_master')->selectOne("SELECT 1 FROM pg_roles WHERE rolname = ?", [$logUser]);
             if (!$logExists) {
-                DB::connection('main')->statement("CREATE USER \"{$logUser}\" WITH PASSWORD '{$logPass}'");
+                DB::connection('tc_master')->statement("CREATE USER \"{$logUser}\" WITH PASSWORD '{$logPass}'");
                 $logCreated = true;
             } else {
-                DB::connection('main')->statement("ALTER USER \"{$logUser}\" WITH PASSWORD '{$logPass}'");
+                DB::connection('tc_master')->statement("ALTER USER \"{$logUser}\" WITH PASSWORD '{$logPass}'");
             }
 
             // 3. Conceder CONNECT no banco para cada user
-            DB::connection('main')->statement("GRANT CONNECT ON DATABASE \"{$dbName}\" TO \"{$sandUser}\"");
-            DB::connection('main')->statement("GRANT CONNECT ON DATABASE \"{$dbName}\" TO \"{$prodUser}\"");
-            DB::connection('main')->statement("GRANT CONNECT ON DATABASE \"{$dbName}\" TO \"{$logUser}\"");
+            DB::connection('tc_master')->statement("GRANT CONNECT ON DATABASE \"{$dbName}\" TO \"{$sandUser}\"");
+            DB::connection('tc_master')->statement("GRANT CONNECT ON DATABASE \"{$dbName}\" TO \"{$prodUser}\"");
+            DB::connection('tc_master')->statement("GRANT CONNECT ON DATABASE \"{$dbName}\" TO \"{$logUser}\"");
 
             // 4. Conectar no novo banco como superuser e configurar os 3 schemas
             $superConfig = array_merge(
-                config('database.connections.main'),
+                config('database.connections.tc_master'),
                 ['database' => $dbName, 'search_path' => 'public']
             );
             config(['database.connections.platform_setup' => $superConfig]);
@@ -113,26 +113,8 @@ class PlatformDatabaseService
             // 5. Configurar conexões dinâmicas
             $this->configurePlatformConnections($dbName, $sandUser, $sandPass, $prodUser, $prodPass, $logUser, $logPass);
 
-            // 6. Migrations
             if ($dbCreated) {
-                // Banco recém-criado: roda tudo (sand + prod + log)
-                Artisan::call('migrate', [
-                    '--database' => 'platform_sand',
-                    '--path'     => 'database/migrations/tenant',
-                    '--force'    => true,
-                ]);
-                Artisan::call('migrate', [
-                    '--database' => 'platform_prod',
-                    '--path'     => 'database/migrations/tenant',
-                    '--force'    => true,
-                ]);
-                Artisan::call('migrate', [
-                    '--database' => 'platform_log',
-                    '--path'     => 'database/migrations/log',
-                    '--force'    => true,
-                ]);
-            } else {
-                // Banco já existia: prod é gerenciado pelo migrate:fresh (main); roda apenas sand e log
+                // 6. Migrations em sand e log (prod via deploy)
                 Artisan::call('migrate', [
                     '--database' => 'platform_sand',
                     '--path'     => 'database/migrations/tenant',
@@ -143,40 +125,23 @@ class PlatformDatabaseService
                     '--path'     => 'database/migrations/log',
                     '--force'    => true,
                 ]);
+
+                // 7. Criar person + user admin em sand
+                $today = now()->toDateString();
+
+                $sandPerson = Person::on('platform_sand')->create([
+                    'name'       => 'Admin ' . $platform->name,
+                    'birth_date' => $today,
+                    'order'      => 1,
+                    'active'     => true,
+                ]);
+                User::on('platform_sand')->create([
+                    'person_id' => $sandPerson->id,
+                    'email'     => 'sand@' . $platform->domain,
+                    'password'  => Hash::make('@sand_' . $platform->slug . '_999'),
+                    'active'    => true,
+                ]);
             }
-
-            // 8. Criar person + user admin em sand e prod (apenas quando banco criado agora)
-            if (! $dbCreated) {
-                return;
-            }
-
-            $today = now()->toDateString();
-
-            $sandPerson = Person::on('platform_sand')->create([
-                'name'       => 'Admin ' . $platform->name,
-                'birth_date' => $today,
-                'order'      => 1,
-                'active'     => true,
-            ]);
-            User::on('platform_sand')->create([
-                'person_id' => $sandPerson->id,
-                'email'     => 'sand@' . $platform->domain,
-                'password'  => Hash::make('@sand_' . $platform->slug . '_999'),
-                'active'    => true,
-            ]);
-
-            $prodPerson = Person::on('platform_prod')->create([
-                'name'       => 'Admin ' . $platform->name,
-                'birth_date' => $today,
-                'order'      => 1,
-                'active'     => true,
-            ]);
-            User::on('platform_prod')->create([
-                'person_id' => $prodPerson->id,
-                'email'     => 'prod@' . $platform->domain,
-                'password'  => Hash::make('@prod_' . $platform->slug . '_999'),
-                'active'    => true,
-            ]);
 
         } catch (\Throwable $e) {
             $this->rollback(
@@ -194,7 +159,7 @@ class PlatformDatabaseService
         string $prodUser, string $prodPass,
         string $logUser,  string $logPass
     ): void {
-        $base = config('database.connections.main');
+        $base = config('database.connections.tc_master');
 
         config([
             'database.connections.platform_sand' => array_merge($base, [
@@ -239,7 +204,7 @@ class PlatformDatabaseService
     ): void {
         // Remover registro da platform no tc_main
         try {
-            DB::connection('main')
+            DB::connection('tc_master')
                 ->table('platforms')
                 ->where('id', $platform->id)
                 ->delete();
@@ -255,13 +220,13 @@ class PlatformDatabaseService
         // Terminar conexões ativas e dropar banco
         if ($dbCreated) {
             try {
-                DB::connection('main')->statement(
+                DB::connection('tc_master')->statement(
                     "SELECT pg_terminate_backend(pid)
                      FROM pg_stat_activity
                      WHERE datname = :db AND pid <> pg_backend_pid()",
                     ['db' => $dbName]
                 );
-                DB::connection('main')->statement("DROP DATABASE IF EXISTS \"{$dbName}\"");
+                DB::connection('tc_master')->statement("DROP DATABASE IF EXISTS \"{$dbName}\"");
             } catch (\Throwable) {
             }
         }
@@ -274,7 +239,7 @@ class PlatformDatabaseService
         ] as [$created, $user]) {
             if ($created) {
                 try {
-                    DB::connection('main')->statement("DROP USER IF EXISTS \"{$user}\"");
+                    DB::connection('tc_master')->statement("DROP USER IF EXISTS \"{$user}\"");
                 } catch (\Throwable) {
                 }
             }

@@ -10,9 +10,6 @@ import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
-// moduleId=4 — módulo pessoas criado pelo MainSeeder em tc_main (firstOrCreate, sempre ID=4 após migrate:fresh)
-const MODULE_ID = 4;
-
 export function PessoasPage() {
   const [birthdayRange, setBirthdayRange] = useState<DateRange | undefined>(undefined);
 
@@ -75,7 +72,8 @@ export function PessoasPage() {
 
   return (
     <GenericGrid
-      moduleId={MODULE_ID}
+      slug="people"
+      title="Pessoas"
       columns={[
         {
           key: 'name',

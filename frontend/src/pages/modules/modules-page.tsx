@@ -102,7 +102,8 @@ export function ModulesPage() {
     <ModuleInlineCtx.Provider value={handleGoInline}>
       <GenericGrid
         key={gridKey}
-        moduleId={1}
+        slug="modules"
+        title="Módulos"
         columns={[
           {
             key: 'name',

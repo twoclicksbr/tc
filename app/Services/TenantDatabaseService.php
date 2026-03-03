@@ -10,7 +10,7 @@ class TenantDatabaseService
 {
     public function provision(Tenant $tenant): void
     {
-        $dbName   = 'tc_' . $tenant->db_name;
+        $dbName   = $tenant->platform->slug . '_' . $tenant->db_name;
         $sandUser = $tenant->sand_user;
         $sandPass = $tenant->sand_password; // auto-decryptado pelo cast 'encrypted'
         $prodUser = $tenant->prod_user;
@@ -25,45 +25,45 @@ class TenantDatabaseService
 
         try {
             // 1. Criar banco de dados (só se ainda não existir)
-            $dbExists = DB::connection('main')->selectOne("SELECT 1 FROM pg_database WHERE datname = ?", [$dbName]);
+            $dbExists = DB::connection('tc_master')->selectOne("SELECT 1 FROM pg_database WHERE datname = ?", [$dbName]);
             if (!$dbExists) {
-                DB::connection('main')->statement("CREATE DATABASE \"{$dbName}\"");
+                DB::connection('tc_master')->statement("CREATE DATABASE \"{$dbName}\"");
                 $dbCreated = true;
             }
 
             // 2. Criar 3 users PostgreSQL (ou atualizar senha se já existirem)
-            $sandExists = DB::connection('main')->selectOne("SELECT 1 FROM pg_roles WHERE rolname = ?", [$sandUser]);
+            $sandExists = DB::connection('tc_master')->selectOne("SELECT 1 FROM pg_roles WHERE rolname = ?", [$sandUser]);
             if (!$sandExists) {
-                DB::connection('main')->statement("CREATE USER \"{$sandUser}\" WITH PASSWORD '{$sandPass}'");
+                DB::connection('tc_master')->statement("CREATE USER \"{$sandUser}\" WITH PASSWORD '{$sandPass}'");
                 $sandCreated = true;
             } else {
-                DB::connection('main')->statement("ALTER USER \"{$sandUser}\" WITH PASSWORD '{$sandPass}'");
+                DB::connection('tc_master')->statement("ALTER USER \"{$sandUser}\" WITH PASSWORD '{$sandPass}'");
             }
 
-            $prodExists = DB::connection('main')->selectOne("SELECT 1 FROM pg_roles WHERE rolname = ?", [$prodUser]);
+            $prodExists = DB::connection('tc_master')->selectOne("SELECT 1 FROM pg_roles WHERE rolname = ?", [$prodUser]);
             if (!$prodExists) {
-                DB::connection('main')->statement("CREATE USER \"{$prodUser}\" WITH PASSWORD '{$prodPass}'");
+                DB::connection('tc_master')->statement("CREATE USER \"{$prodUser}\" WITH PASSWORD '{$prodPass}'");
                 $prodCreated = true;
             } else {
-                DB::connection('main')->statement("ALTER USER \"{$prodUser}\" WITH PASSWORD '{$prodPass}'");
+                DB::connection('tc_master')->statement("ALTER USER \"{$prodUser}\" WITH PASSWORD '{$prodPass}'");
             }
 
-            $logExists = DB::connection('main')->selectOne("SELECT 1 FROM pg_roles WHERE rolname = ?", [$logUser]);
+            $logExists = DB::connection('tc_master')->selectOne("SELECT 1 FROM pg_roles WHERE rolname = ?", [$logUser]);
             if (!$logExists) {
-                DB::connection('main')->statement("CREATE USER \"{$logUser}\" WITH PASSWORD '{$logPass}'");
+                DB::connection('tc_master')->statement("CREATE USER \"{$logUser}\" WITH PASSWORD '{$logPass}'");
                 $logCreated = true;
             } else {
-                DB::connection('main')->statement("ALTER USER \"{$logUser}\" WITH PASSWORD '{$logPass}'");
+                DB::connection('tc_master')->statement("ALTER USER \"{$logUser}\" WITH PASSWORD '{$logPass}'");
             }
 
             // 3. Conceder CONNECT no banco para cada user
-            DB::connection('main')->statement("GRANT CONNECT ON DATABASE \"{$dbName}\" TO \"{$sandUser}\"");
-            DB::connection('main')->statement("GRANT CONNECT ON DATABASE \"{$dbName}\" TO \"{$prodUser}\"");
-            DB::connection('main')->statement("GRANT CONNECT ON DATABASE \"{$dbName}\" TO \"{$logUser}\"");
+            DB::connection('tc_master')->statement("GRANT CONNECT ON DATABASE \"{$dbName}\" TO \"{$sandUser}\"");
+            DB::connection('tc_master')->statement("GRANT CONNECT ON DATABASE \"{$dbName}\" TO \"{$prodUser}\"");
+            DB::connection('tc_master')->statement("GRANT CONNECT ON DATABASE \"{$dbName}\" TO \"{$logUser}\"");
 
             // 4. Conectar no novo banco como superuser e configurar os 3 schemas
             $superConfig = array_merge(
-                config('database.connections.main'),
+                config('database.connections.tc_master'),
                 ['database' => $dbName, 'search_path' => 'public']
             );
             config(['database.connections.tenant_setup' => $superConfig]);
@@ -74,9 +74,9 @@ class TenantDatabaseService
             $setup->statement("DROP SCHEMA IF EXISTS public CASCADE");
 
             // b. Criar schemas
-            $setup->statement("CREATE SCHEMA sand");
-            $setup->statement("CREATE SCHEMA prod");
-            $setup->statement("CREATE SCHEMA log");
+            $setup->statement("CREATE SCHEMA IF NOT EXISTS sand");
+            $setup->statement("CREATE SCHEMA IF NOT EXISTS prod");
+            $setup->statement("CREATE SCHEMA IF NOT EXISTS log");
 
             // c. Transferir ownership
             $setup->statement("ALTER SCHEMA sand OWNER TO \"{$sandUser}\"");
@@ -98,24 +98,21 @@ class TenantDatabaseService
             // 5. Configurar conexões dinâmicas
             $this->configureTenantConnections($dbName, $sandUser, $sandPass, $prodUser, $prodPass, $logUser, $logPass);
 
-            // 6. Migrations de tenant em sand e prod
-            Artisan::call('migrate', [
-                '--database' => 'tenant_sand',
-                '--path'     => 'database/migrations/tenant',
-                '--force'    => true,
-            ]);
-            Artisan::call('migrate', [
-                '--database' => 'tenant_prod',
-                '--path'     => 'database/migrations/tenant',
-                '--force'    => true,
-            ]);
+            if ($dbCreated) {
+                // 6. Migrations de tenant em sand (prod via deploy)
+                Artisan::call('migrate', [
+                    '--database' => 'tenant_sand',
+                    '--path'     => 'database/migrations/tenant',
+                    '--force'    => true,
+                ]);
 
-            // 7. Migration de log
-            Artisan::call('migrate', [
-                '--database' => 'tenant_log',
-                '--path'     => 'database/migrations/log',
-                '--force'    => true,
-            ]);
+                // 7. Migration de log
+                Artisan::call('migrate', [
+                    '--database' => 'tenant_log',
+                    '--path'     => 'database/migrations/log',
+                    '--force'    => true,
+                ]);
+            }
 
         } catch (\Throwable $e) {
             $this->rollback(
@@ -133,7 +130,7 @@ class TenantDatabaseService
         string $prodUser, string $prodPass,
         string $logUser,  string $logPass
     ): void {
-        $base = config('database.connections.main');
+        $base = config('database.connections.tc_master');
 
         config([
             'database.connections.tenant_sand' => array_merge($base, [
@@ -178,7 +175,7 @@ class TenantDatabaseService
     ): void {
         // Remover registro do tenant no tc_main
         try {
-            DB::connection('main')
+            DB::connection('tc_master')
                 ->table('tenants')
                 ->where('id', $tenant->id)
                 ->delete();
@@ -194,13 +191,13 @@ class TenantDatabaseService
         // Terminar conexões ativas e dropar banco
         if ($dbCreated) {
             try {
-                DB::connection('main')->statement(
+                DB::connection('tc_master')->statement(
                     "SELECT pg_terminate_backend(pid)
                      FROM pg_stat_activity
                      WHERE datname = :db AND pid <> pg_backend_pid()",
                     ['db' => $dbName]
                 );
-                DB::connection('main')->statement("DROP DATABASE IF EXISTS \"{$dbName}\"");
+                DB::connection('tc_master')->statement("DROP DATABASE IF EXISTS \"{$dbName}\"");
             } catch (\Throwable) {
             }
         }
@@ -213,7 +210,7 @@ class TenantDatabaseService
         ] as [$created, $user]) {
             if ($created) {
                 try {
-                    DB::connection('main')->statement("DROP USER IF EXISTS \"{$user}\"");
+                    DB::connection('tc_master')->statement("DROP USER IF EXISTS \"{$user}\"");
                 } catch (\Throwable) {
                 }
             }

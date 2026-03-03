@@ -55,8 +55,8 @@ class ResolveTenant
         config(['app.access_level' => $accessLevel]);
 
         // Configura search_path na conexão main para lookup da platform
-        config(['database.connections.main.search_path' => $schema . ',log']);
-        DB::purge('main');
+        config(['database.connections.tc_master.search_path' => $schema . ',log']);
+        DB::purge('tc_master');
 
         // Busca a platform pelo slug
         $platform = Platform::where('slug', $platformSlug)->first();
@@ -71,14 +71,14 @@ class ResolveTenant
                 'database.connections.main.database'    => $platform->db_name,
                 'database.connections.main.search_path' => $schema . ',log',
             ]);
-            DB::purge('main');
-            DB::setDefaultConnection('main');
+            DB::purge('tc_master');
+            DB::setDefaultConnection('tc_master');
             return $next($request);
         }
 
         // Acesso de tenant → busca tenant no banco master da platform
         $platformMasterConfig = array_merge(
-            config('database.connections.main'),
+            config('database.connections.tc_master'),
             [
                 'database'    => $platform->db_name,
                 'username'    => $schema === 'sand' ? $platform->sand_user : $platform->prod_user,
@@ -104,7 +104,7 @@ class ResolveTenant
         $password = $schema === 'sand' ? $tenant->sand_password : $tenant->prod_password;
 
         config(['database.connections.tenant' => array_merge(
-            config('database.connections.main'),
+            config('database.connections.tc_master'),
             [
                 'database'    => $tenantDb,
                 'username'    => $username,
