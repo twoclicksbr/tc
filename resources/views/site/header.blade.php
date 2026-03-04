@@ -40,7 +40,13 @@
                         <a class="nav-link scroll" data-fancybox="" data-src="#modal-contact">Contato</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ env('SYSTEM_URL', 'https://master.twoclicks.com.br') }}">Login</a>
+                        @php
+                            $host = request()->getHost();
+                            $loginUrl = str_contains($host, '.test')
+                                ? 'http://master.' . $host . ':5173'
+                                : 'https://master.' . $host;
+                        @endphp
+                        <a class="nav-link" href="{{ $loginUrl }}">Login</a>
                     </li>
                 </ul>
             </nav>

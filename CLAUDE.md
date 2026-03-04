@@ -29,7 +29,7 @@ Mergea branch de feature na main. Fetch, seleção de branch, merge, push da mai
 Arquivo: `.claude/commands/merge.md`
 
 ### /deploy
-Deploy no servidor sandbox. Merge main → sandbox, push, SSH: git pull + composer + migrate + cache no backend; git pull + npm install + build no frontend. Opção de seeders.
+Deploy no servidor sandbox. Merge main → sandbox, push, SSH (`ssh twoclicks`): git pull + composer + migrate + cache no backend; git pull + npm install --legacy-peer-deps + build no frontend. Opção de seeders.
 Arquivo: `.claude/commands/deploy.md`
 
 ### /merge-production
@@ -473,6 +473,29 @@ Resolve a conexão do banco com base no hostname ou headers.
 
 ---
 
+## Site Institucional (Blade)
+
+Servido pelo Laravel via rotas `web` em `routes/web.php`. Views em `resources/views/site/`.
+
+**Rotas web:**
+| Rota | Comportamento |
+|------|--------------|
+| `GET /` | Renderiza `site.home` (site institucional) |
+| `GET /login` | Redireciona para `http://master.tc.test:5173/auth/signin` |
+
+**Views (`resources/views/site/`):**
+| Arquivo | Descrição |
+|---------|-----------|
+| `home.blade.php` | Layout principal — inclui head, sandbox-banner, header, footer, modal, script |
+| `sandbox-banner.blade.php` | Tarja vermelha de aviso — exibida quando `str_contains(request()->getHost(), 'sandbox')`; `position:fixed; top:0; z-index:9999`; spacer de 36px abaixo |
+| `header.blade.php` | Header com navbar — botão Login com URL dinâmica via `request()->getHost()`: `.test` → `http://master.{host}:5173`; produção → `https://master.{host}` |
+| `footer.blade.php` | Rodapé com copyright dinâmico (`date('Y')`) |
+
+**Configuração:**
+- `SESSION_DRIVER=file` — site institucional é estático, não usa session em banco
+
+---
+
 ## Frontend (Metronic React)
 
 - **Pasta:** `frontend/`
@@ -701,22 +724,24 @@ server: { host: '0.0.0.0', port: 5173, https: false, allowedHosts: ['.tc.test', 
 
 ---
 
-## Deploy (conceitual, não implementado)
+## Deploy
 
-5 comandos: `/docs` (reformulado), `/merge`, `/deploy`, `/merge-production`, `/deploy-production`.
+5 comandos: `/docs`, `/merge`, `/deploy`, `/merge-production`, `/deploy-production`.
 
 Branches protegidas: main, sandbox, production. Fluxo: feature → main → sandbox → production.
+
+**SSH:** alias `twoclicks` → `root@168.231.64.36` (configurado em `~/.ssh/config`)
 
 **Estrutura no servidor:**
 ```
 /var/www/tc/
-├── sand/
-│   ├── backend/
-│   └── web/
-└── prod/
-    ├── backend/
-    └── web/
+├── sand/          ← branch sandbox
+│   └── frontend/
+└── prod/          ← branch production
+    └── frontend/
 ```
+
+**Obs:** `npm install` no servidor requer `--legacy-peer-deps` (conflito `react-helmet-async@2` + React 19).
 
 ---
 

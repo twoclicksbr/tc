@@ -4,6 +4,9 @@
 @include('site.head')
 
 <body>
+    <!-- sandbox banner -->
+    @include('site.sandbox-banner')
+
     <!-- header -->
     @include('site.header')
 

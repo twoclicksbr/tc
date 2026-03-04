@@ -16,7 +16,7 @@ git push origin sandbox
 
 ## Passo 3 — Deploy backend via SSH
 
-Conecte via SSH no servidor e execute em /var/www/tc/sand/:
+Conecte via SSH (`ssh twoclicks`) e execute em /var/www/tc/sand/:
 
 git pull origin sandbox
 composer install --no-dev --optimize-autoloader
@@ -39,10 +39,10 @@ php artisan db:seed --class={SeederSelecionado} --force
 
 ## Passo 5 — Deploy frontend via SSH
 
-Em /var/www/tc/sand/frontend/:
+Conecte via SSH (`ssh twoclicks`) e execute em /var/www/tc/sand/frontend/:
 
 git pull origin sandbox
-npm install
+npm install --legacy-peer-deps
 npm run build
 
 ## Passo 6 — Confirmação
