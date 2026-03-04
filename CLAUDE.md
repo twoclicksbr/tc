@@ -520,6 +520,8 @@ VITE_PLATFORM_SLUG=tc
 
 QueryClientProvider > AuthProvider > PlatformProvider > SettingsProvider > ThemeProvider > I18nProvider > HelmetProvider > TooltipsProvider > QueryProvider > LoadingBarContainer > BrowserRouter > ModulesProvider > AppRouting
 
+**ThemeProvider (`providers/theme-provider.tsx`):** `next-themes` com `defaultTheme="light"`, `storageKey="vite-theme"`. `enableSystem` removido — tema padrão é sempre light para manter o toggle (`checked={theme === 'dark'}`) sincronizado. Usuário pode alternar via dropdown no header.
+
 ### Auth (Laravel Sanctum)
 
 | Arquivo | Descrição |
