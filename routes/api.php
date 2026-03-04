@@ -27,7 +27,9 @@ Route::prefix('v1')->group(function () {
         Route::get('platforms/{id}/credentials', [PlatformController::class, 'credentials']);
 
         // Rotas específicas de modules (antes do genérico para evitar conflito)
-        Route::get('modules/scan-files', [ModuleController::class, 'scanFiles']);
+        Route::get('modules/scan-files',           [ModuleController::class, 'scanFiles']);
+        Route::get('modules/{id}/table-status',    [ModuleController::class, 'tableStatus']);
+        Route::post('modules/{id}/generate-table', [ModuleController::class, 'generateTable']);
 
         // Módulos genéricos
         Route::prefix('{module}')->group(function () {

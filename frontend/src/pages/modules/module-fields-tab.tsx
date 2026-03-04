@@ -18,7 +18,7 @@ import {
   useSortableRow,
   DragHandle,
 } from '@/lib/dnd-config';
-import { GripVertical, Link2, Plus, Trash2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Database, GripVertical, Link2, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -31,6 +31,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { apiDelete, apiGet, apiPost, apiPut } from '@/lib/api';
+import { toast } from 'sonner';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -51,6 +52,29 @@ interface FieldForEdit {
   is_system: boolean;
   order: number;
   active: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// TableStatus types
+// ---------------------------------------------------------------------------
+
+interface TableStatusChange {
+  field:  string;
+  status: 'new' | 'altered' | 'removed' | 'synced';
+  detail: string | null;
+}
+
+interface DangerousChange {
+  field:  string;
+  reason: string;
+}
+
+interface TableStatus {
+  table_exists:        boolean;
+  table_name:          string;
+  changes:             TableStatusChange[];
+  has_pending_changes: boolean;
+  dangerous_changes:   DangerousChange[];
 }
 
 // ---------------------------------------------------------------------------
@@ -470,6 +494,147 @@ function FieldTableRow({ field, isReadOnly, onChange, onDelete }: FieldTableRowP
 }
 
 // ---------------------------------------------------------------------------
+// GenerateTableModal
+// ---------------------------------------------------------------------------
+
+interface GenerateTableModalProps {
+  open:                   boolean;
+  status:                 TableStatus | null;
+  loading:                boolean;
+  generating:             boolean;
+  dangerConfirmed:        boolean;
+  onConfirm:              () => void;
+  onCancel:               () => void;
+  onDangerConfirmedChange: (v: boolean) => void;
+}
+
+function GenerateTableModal({
+  open, status, loading, generating,
+  dangerConfirmed, onConfirm, onCancel, onDangerConfirmedChange,
+}: GenerateTableModalProps) {
+  const tableExists  = status?.table_exists ?? false;
+  const hasChanges   = status?.has_pending_changes ?? false;
+  const tableName    = status?.table_name ?? '';
+  const hasDanger    = (status?.dangerous_changes?.length ?? 0) > 0;
+  const canApply     = !hasDanger || dangerConfirmed;
+  const pendingChanges = (status?.changes ?? []).filter(c => c.status !== 'synced');
+
+  const title = !tableExists
+    ? `Criar tabela \`${tableName}\``
+    : hasChanges
+    ? `Alterações pendentes — \`${tableName}\``
+    : `Status da tabela \`${tableName}\``;
+
+  return (
+    <Dialog open={open} onOpenChange={v => !v && onCancel()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+
+        <div className="flex flex-col gap-3 py-1">
+          {loading && (
+            <p className="text-sm text-muted-foreground text-center py-4">Carregando status...</p>
+          )}
+
+          {!loading && status && (
+            <>
+              {/* Synced */}
+              {tableExists && !hasChanges && (
+                <div className="flex items-center gap-2 text-sm text-success">
+                  <CheckCircle2 className="size-4" />
+                  A tabela está sincronizada. Nenhuma alteração necessária.
+                </div>
+              )}
+
+              {/* Create — lista de campos novos */}
+              {!tableExists && (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    A tabela será criada com <strong>{pendingChanges.length}</strong> campos.
+                  </p>
+                  <ul className="flex flex-col gap-1 max-h-48 overflow-y-auto text-xs font-mono text-success">
+                    {pendingChanges.map(c => (
+                      <li key={c.field} className="flex items-center gap-2">
+                        <span>+</span>
+                        <span>{c.field}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+
+              {/* Alter — lista de mudanças */}
+              {tableExists && hasChanges && (
+                <ul className="flex flex-col gap-1.5 max-h-52 overflow-y-auto text-xs font-mono">
+                  {pendingChanges.map(c => {
+                    const color = c.status === 'new'
+                      ? 'text-success'
+                      : c.status === 'altered'
+                      ? 'text-warning'
+                      : 'text-destructive';
+                    const icon = c.status === 'new' ? '+' : c.status === 'altered' ? '△' : '×';
+                    return (
+                      <li key={c.field} className={`flex flex-col gap-0.5 ${color}`}>
+                        <span><strong>{icon} {c.field}</strong></span>
+                        {c.detail && (
+                          <span className="pl-3 text-muted-foreground break-all">{c.detail}</span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+
+              {/* Dangerous changes */}
+              {hasDanger && (
+                <div className="flex flex-col gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-destructive">
+                    <AlertTriangle className="size-4" />
+                    Alterações de risco
+                  </div>
+                  <ul className="flex flex-col gap-1 text-xs text-destructive">
+                    {status!.dangerous_changes.map(d => (
+                      <li key={d.field} className="flex gap-2">
+                        <span className="font-mono font-semibold shrink-0">{d.field}:</span>
+                        <span>{d.reason}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <label className="flex items-center gap-2 cursor-pointer text-sm mt-1">
+                    <Checkbox
+                      checked={dangerConfirmed}
+                      onCheckedChange={v => onDangerConfirmedChange(!!v)}
+                    />
+                    Confirmo que entendo os riscos das alterações acima
+                  </label>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" size="sm" onClick={onCancel} disabled={generating}>
+            {tableExists && !hasChanges ? 'Fechar' : 'Cancelar'}
+          </Button>
+          {(tableExists ? hasChanges : true) && (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={onConfirm}
+              disabled={!canApply || generating || loading}
+            >
+              {generating ? 'Gerando...' : tableExists ? 'Aplicar Alterações' : 'Criar Tabela'}
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // ModuleFieldsTab
 // ---------------------------------------------------------------------------
 
@@ -484,9 +649,14 @@ export function ModuleFieldsTab({ moduleId, mode }: ModuleFieldsTabProps) {
   const sensors    = useDndSensors();
   const isReadOnly = mode === 'show';
 
-  const [fields,   setFields]   = useState<FieldForEdit[]>([]);
-  const [loading,  setLoading]  = useState(true);
-  const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
+  const [fields,          setFields]          = useState<FieldForEdit[]>([]);
+  const [loading,         setLoading]         = useState(true);
+  const [activeId,        setActiveId]        = useState<UniqueIdentifier | null>(null);
+  const [tableStatus,     setTableStatus]     = useState<TableStatus | null>(null);
+  const [statusLoading,   setStatusLoading]   = useState(false);
+  const [genModalOpen,    setGenModalOpen]    = useState(false);
+  const [generating,      setGenerating]      = useState(false);
+  const [dangerConfirmed, setDangerConfirmed] = useState(false);
 
   const fieldsRef      = useRef<FieldForEdit[]>([]);
   const debounceTimers = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
@@ -514,6 +684,21 @@ export function ModuleFieldsTab({ moduleId, mode }: ModuleFieldsTabProps) {
       .then(res => setFields(sortFields(res.data.map(normalize))))
       .catch(() => {})
       .finally(() => setLoading(false));
+  }, [moduleId]);
+
+  // ── Table status ───────────────────────────────────────────────────────────
+
+  function fetchTableStatus() {
+    setStatusLoading(true);
+    apiGet<TableStatus>(`/v1/modules/${moduleId}/table-status`)
+      .then(setTableStatus)
+      .catch(() => {})
+      .finally(() => setStatusLoading(false));
+  }
+
+  useEffect(() => { // eslint-disable-line react-hooks/exhaustive-deps
+    if (!moduleId) return;
+    fetchTableStatus();
   }, [moduleId]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
@@ -565,6 +750,28 @@ export function ModuleFieldsTab({ moduleId, mode }: ModuleFieldsTabProps) {
       setFields(prev => prev.filter(f => f.id !== id));
     } catch (err) {
       console.error('[ModuleFieldsTab] Erro ao deletar campo:', err);
+    }
+  }
+
+  function handleOpenModal() {
+    setDangerConfirmed(false);
+    setGenModalOpen(true);
+    fetchTableStatus();
+  }
+
+  async function handleGenerateTable() {
+    setGenerating(true);
+    try {
+      await apiPost(`/v1/modules/${moduleId}/generate-table`, {
+        confirm_dangerous: dangerConfirmed,
+      });
+      toast.success('Tabela gerada com sucesso!');
+      setGenModalOpen(false);
+      fetchTableStatus();
+    } catch {
+      toast.error('Erro ao gerar tabela.');
+    } finally {
+      setGenerating(false);
     }
   }
 
@@ -622,6 +829,40 @@ export function ModuleFieldsTab({ moduleId, mode }: ModuleFieldsTabProps) {
 
   return (
     <div className={`flex flex-col gap-3 ${isReadOnly ? 'pointer-events-none opacity-60' : ''}`}>
+
+      {/* Header: status badge + botão Gerar Tabela */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {statusLoading && (
+            <span className="text-xs text-muted-foreground">Verificando tabela...</span>
+          )}
+          {!statusLoading && tableStatus && (
+            tableStatus.table_exists
+              ? tableStatus.has_pending_changes
+                ? <span className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-2 py-0.5 text-xs font-medium text-warning">
+                    {tableStatus.changes.filter(c => c.status !== 'synced').length} pendentes
+                  </span>
+                : <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-xs font-medium text-success">
+                    <CheckCircle2 className="size-3" />
+                    Sincronizado
+                  </span>
+              : <span className="inline-flex items-center gap-1 rounded-full bg-destructive/15 px-2 py-0.5 text-xs font-medium text-destructive">
+                  Tabela não existe
+                </span>
+          )}
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="gap-1.5"
+          onClick={handleOpenModal}
+          disabled={statusLoading}
+        >
+          <Database className="size-4" />
+          Gerar Tabela
+        </Button>
+      </div>
 
       <DndContext
         id={tabDndId}
@@ -708,6 +949,17 @@ export function ModuleFieldsTab({ moduleId, mode }: ModuleFieldsTabProps) {
           Adicionar Campo
         </button>
       )}
+
+      <GenerateTableModal
+        open={genModalOpen}
+        status={tableStatus}
+        loading={statusLoading}
+        generating={generating}
+        dangerConfirmed={dangerConfirmed}
+        onConfirm={handleGenerateTable}
+        onCancel={() => setGenModalOpen(false)}
+        onDangerConfirmedChange={setDangerConfirmed}
+      />
 
     </div>
   );

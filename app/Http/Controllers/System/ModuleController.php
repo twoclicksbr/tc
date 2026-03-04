@@ -4,6 +4,7 @@ namespace App\Http\Controllers\System;
 
 use App\Http\Controllers\Controller;
 use App\Models\Module;
+use App\Services\TableGeneratorService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -291,5 +292,32 @@ class ModuleController extends Controller
         $item->restore();
 
         return response()->json($item);
+    }
+
+    public function tableStatus(int $id): JsonResponse
+    {
+        $module  = Module::findOrFail($id);
+        $service = new TableGeneratorService();
+
+        return response()->json($service->getTableStatus($module));
+    }
+
+    public function generateTable(Request $request, int $id): JsonResponse
+    {
+        $module           = Module::findOrFail($id);
+        $confirmDangerous = (bool) $request->input('confirm_dangerous', false);
+        $service          = new TableGeneratorService();
+
+        $result = $service->generateTable($module, $confirmDangerous);
+
+        if (isset($result['requires_confirm']) && $result['requires_confirm']) {
+            return response()->json($result, 422);
+        }
+
+        if (! $result['success']) {
+            return response()->json($result, 500);
+        }
+
+        return response()->json($result);
     }
 }

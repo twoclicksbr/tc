@@ -331,6 +331,8 @@ Todas protegidas por `auth:sanctum`. `{module}` = `slug` do registro na tabela `
 - `GET /v1/platforms/{id}/credentials` → `System\PlatformController::credentials`
 - `GET /v1/modules/scan-files` → `System\ModuleController::scanFiles`
 - `GET /v1/modules/check-slug` → `System\ModuleController::checkSlug`
+- `GET /v1/modules/{id}/table-status` → `System\ModuleController::tableStatus`
+- `POST /v1/modules/{id}/generate-table` → `System\ModuleController::generateTable` (body: `{ confirm_dangerous: bool }`)
 
 **Filtros do index:**
 ```
@@ -348,7 +350,7 @@ Todas protegidas por `auth:sanctum`. `{module}` = `slug` do registro na tabela `
 | Pasta | Controllers |
 |-------|-------------|
 | `Auth/` | `AuthController` (login, logout, me) |
-| `System/` | `ModuleController` (CRUD genérico + scanFiles + checkSlug), `TenantController` (credentials), `PlatformController` (credentials) |
+| `System/` | `ModuleController` (CRUD genérico + scanFiles + checkSlug + tableStatus + generateTable), `TenantController` (credentials), `PlatformController` (credentials) |
 
 ### Middleware Multi-Tenancy (`ResolveTenant.php`)
 
@@ -439,6 +441,7 @@ Resolve a conexão do banco com base no hostname ou headers.
 |---------|-----------|
 | `TenantDatabaseService` | `provision(Tenant)`: dbName = `{platform.slug}_{tenant.db_name}` (prefixo dinâmico). Cria banco, 3 users, 3 schemas. Banco novo → migrations sand + log + admin users. Banco existente → só garante infra (users, schemas), pula migrations. Idempotente. Rollback em erro. |
 | `PlatformDatabaseService` | Mesma lógica. Banco novo → migrations sand + log + admin users (`sand@{domain}` / `prod@{domain}`, senhas `@sand_{slug}_999` / `@prod_{slug}_999`). Banco existente → só infra. |
+| `TableGeneratorService` | Geração dinâmica de tabelas a partir de `module_fields`. Métodos públicos: `getTableStatus(Module): array` (compara campos ativos com `information_schema.columns` → retorna `table_exists`, `table_name`, `changes[]`, `has_pending_changes`, `dangerous_changes[]`) e `generateTable(Module, confirmDangerous): array` (CREATE ou ALTER TABLE com backup automático + rollback em erro). Usa schema ativo via `current_schema()`. Status por campo: `synced`, `new`, `altered`, `removed`. Alterações perigosas: mudança de tipo com dados, DROP com dados, NOT NULL com NULLs existentes. Mapeamento de tipos: string→varchar, text→text, integer→integer, bigint→bigint, boolean→boolean, date→date, datetime→timestamp, decimal→numeric, enum→varchar. |
 
 ### Seeders (`database/seeders/`)
 
@@ -658,6 +661,15 @@ Botões: Visualizar (Eye), Editar (Pencil), Deletar (Trash2), Restaurar (RotateC
 - Delete: qualquer campo não-system pode ser deletado (removida guarda `isCustom`)
 - `handleAdd()`: novo campo com `order = maxOrder(nonSystem) + 1`
 - `FkModal`: removido campo `fk_label`; `onConfirm` retorna `(table, column)` apenas
+- **Botão "Gerar Tabela"** no header da tab: ícone Database, chama `GET /v1/modules/{id}/table-status` ao abrir
+- **Badge de status** ao lado do botão: "Verificando tabela…" (loading) | "Tabela não existe" (vermelho) | "N pendentes" (amarelo) | "Sincronizado" (verde)
+- **`GenerateTableModal`** (max-w-lg): 3 estados visuais:
+  - `table_exists=false` → lista de campos a criar em verde + botão "Criar Tabela"
+  - `has_pending_changes=true` → lista com ícones + cores por status (+ verde / △ amarelo / × vermelho) + seção "Alterações de risco" com checkbox de confirmação quando `dangerous_changes` presente
+  - synced → ✓ "A tabela está sincronizada" + botão "Fechar"
+- `fetchTableStatus()`: disparado no mount + ao abrir modal; re-executa após geração bem-sucedida
+- `handleGenerateTable()`: POST com `{ confirm_dangerous }` → `toast.success` / `toast.error`
+- `TableStatus` interface: `{ table_exists, table_name, changes: TableStatusChange[], has_pending_changes, dangerous_changes: DangerousChange[] }`
 
 #### PlatformsPage / TenantsPage — Grid + CRM modal
 
