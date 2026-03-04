@@ -630,7 +630,7 @@ Botões: Visualizar (Eye), Editar (Pencil), Deletar (Trash2), Restaurar (RotateC
 - Coluna `order` removida do grid (posição visual comunica a ordem)
 - Filtro de pesquisa: apenas por Tipo (removido filtro Proprietário)
 - Clique no nome → renderiza ModuleShowModal inline
-- ModuleShowModal tabs: Dados ✅, Campos ✅, Grid (futuro), Form (futuro), Restrições (futuro), Seeds (futuro)
+- ModuleShowModal tabs: Dados ✅, Campos ✅, Layout ✅, Grid (futuro), Form (futuro), Restrições (futuro), Seeds (futuro)
 
 **ModuleShowModal — aba Dados:**
 - Header: botão "← Voltar" + `#ID` + Nome + badge Ativo/Inativo + badge Tipo (sem badge owner_level)
@@ -670,6 +670,16 @@ Botões: Visualizar (Eye), Editar (Pencil), Deletar (Trash2), Restaurar (RotateC
 - `fetchTableStatus()`: disparado no mount + ao abrir modal; re-executa após geração bem-sucedida
 - `handleGenerateTable()`: POST com `{ confirm_dangerous }` → `toast.success` / `toast.error`
 - `TableStatus` interface: `{ table_exists, table_name, changes: TableStatusChange[], has_pending_changes, dangerous_changes: DangerousChange[] }`
+
+**`ModuleLayoutTab` (aba Layout) — `pages/modules/components/module-layout-tab.tsx`:**
+- Prop: `moduleId: number` (para uso futuro na API)
+- Sidebar esquerda colapsável (w-56 / w-10): catálogo de componentes ou painel de propriedades do selecionado
+- Catálogo: 10 componentes com ícones Lucide — Grid (LayoutGrid), Form (FormInput), Card (Square), Texto (Type), Botões (MousePointer), Container (Box), Abas (Layers), Gráfico (BarChart2), Imagem (Image), Divisor (Minus)
+- Painel de propriedades: selects, inputs, número e toggles por tipo de componente
+- Page tabs: 9 subabas — Index, Show, Create, Edit, Delete, Restore, Print, Dashboard, Pública
+- Stage: área com fundo xadrez; clique em componente adiciona ao stage; item selecionado recebe ring azul
+- Ações da toolbar: **Preview** | **Fullscreen** (Maximize2/Minimize2 — toggle `fixed inset-0 z-50 bg-white`) | **Salvar** (feedback "✓ Salvo" por 2s)
+- Sem header simulado — usa header/tabs do `ModuleShowModal`
 
 #### PlatformsPage / TenantsPage — Grid + CRM modal
 
@@ -736,9 +746,11 @@ server: { host: '0.0.0.0', port: 5173, https: false, allowedHosts: ['.tc.test', 
 
 ---
 
-## Page Builder (conceitual, não implementado)
+## Page Builder (em desenvolvimento)
 
-**Localização:** Aba "Página" no ModuleShowModal inline. 9 subabas: Index, Show, Create, Edit, Delete, Restore, Print, Dashboard, Pública.
+**Localização:** Aba "Layout" no ModuleShowModal (inline + dialog). 9 subabas: Index, Show, Create, Edit, Delete, Restore, Print, Dashboard, Pública.
+
+**Implementado:** UI base do builder — sidebar colapsável com catálogo + properties panel, stage com xadrez, page tabs, toolbar (Preview/Fullscreen/Salvar). Arquivo: `frontend/src/pages/modules/components/module-layout-tab.tsx`.
 
 **Layout:** 3 colunas — Componentes (~15%) | Stage (~60%) | Painel (~25%)
 

@@ -24,6 +24,7 @@ import { apiGet, apiPut } from '@/lib/api';
 import { useModules } from '@/providers/modules-provider';
 import { type ModuleForEdit } from './module-modal';
 import { ModuleFieldsTab } from './module-fields-tab';
+import { ModuleLayoutTab } from './components/module-layout-tab';
 
 interface ModuleShowModalProps {
   open: boolean;
@@ -547,6 +548,7 @@ export function ModuleShowModal({ open, onOpenChange, record, onSuccess, inline 
           <TabsList variant="line" className="px-4 shrink-0">
             <TabsTrigger value="dados">Dados</TabsTrigger>
             <TabsTrigger value="campos">Campos</TabsTrigger>
+            <TabsTrigger value="layout">Layout</TabsTrigger>
             <TabsTrigger value="grid">Grid</TabsTrigger>
             <TabsTrigger value="form">Form</TabsTrigger>
             <TabsTrigger value="restricoes">Restrições</TabsTrigger>
@@ -558,6 +560,9 @@ export function ModuleShowModal({ open, onOpenChange, record, onSuccess, inline 
           </TabsContent>
           <TabsContent value="campos" className="p-4">
             <ModuleFieldsTab moduleId={record.id} mode="edit" active={activeTab === 'campos'} />
+          </TabsContent>
+          <TabsContent value="layout" className="p-0 flex flex-1 overflow-hidden">
+            <ModuleLayoutTab moduleId={record.id} />
           </TabsContent>
           <TabsContent value="grid" className="p-4">
             <p className="text-sm text-muted-foreground">Em desenvolvimento</p>
@@ -635,6 +640,7 @@ export function ModuleShowModal({ open, onOpenChange, record, onSuccess, inline 
                 <TabsList variant="line" className="px-4 shrink-0">
                   <TabsTrigger value="dados">Dados</TabsTrigger>
                   <TabsTrigger value="campos">Campos</TabsTrigger>
+                  <TabsTrigger value="layout">Layout</TabsTrigger>
                   <TabsTrigger value="grid">Grid</TabsTrigger>
                   <TabsTrigger value="form">Form</TabsTrigger>
                   <TabsTrigger value="restricoes">Restrições</TabsTrigger>
@@ -646,6 +652,9 @@ export function ModuleShowModal({ open, onOpenChange, record, onSuccess, inline 
                 </TabsContent>
                 <TabsContent value="campos" className="flex-1 overflow-y-auto p-6">
                   <ModuleFieldsTab moduleId={record.id} mode="edit" active={activeTab === 'campos'} />
+                </TabsContent>
+                <TabsContent value="layout" className="flex-1 flex overflow-hidden p-0">
+                  <ModuleLayoutTab moduleId={record.id} />
                 </TabsContent>
                 <TabsContent value="grid" className="flex-1 overflow-y-auto p-6">
                   <p className="text-sm text-muted-foreground">Em desenvolvimento</p>
