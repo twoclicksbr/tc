@@ -17,26 +17,26 @@ class ResolveTenant
         //
         // Produção — hostname: {tenant}.{platform}.api.{base-domain}
         //   master.tc.api.twoclicks.com.br  → tenant=master, platform=tc
-        //   master.tc.sandbox.api.tc.test   → tenant=master, platform=tc, sandbox
         //
-        // Dev local — hostname simples (ex: api.tc.test) + headers:
-        //   X-Tenant: master
-        //   X-Platform: tc
-        //   X-Sandbox: 1  (opcional)
+        // Header-based (dev local + sandbox fixo):
+        //   hostname começa com 'api.' (ex: api.tc.test, api.sandbox.twoclicks.com.br)
+        //   ou hostname tem < 4 partes → usa headers X-Tenant, X-Platform, X-Sandbox
 
         $host  = $request->getHost();
         $parts = explode('.', $host);
 
-        if (count($parts) >= 4) {
+        $useHeaders = count($parts) < 4 || $parts[0] === 'api';
+
+        if (! $useHeaders) {
             // Produção: tenant e platform no subdomínio
             $tenantSlug   = $parts[0];
             $platformSlug = $parts[1];
-            $isSandbox    = ($parts[2] === 'sandbox');
+            $isSandbox    = in_array('sandbox', array_slice($parts, 2));
         } else {
-            // Dev local: lê dos headers
+            // Dev local / sandbox fixo: lê dos headers
             $tenantSlug   = $request->header('X-Tenant');
             $platformSlug = $request->header('X-Platform');
-            $isSandbox    = $request->header('X-Sandbox') === '1';
+            $isSandbox    = in_array($request->header('X-Sandbox'), ['1', 'true']);
 
             if (! $tenantSlug || ! $platformSlug) {
                 return response()->json(['message' => 'Host inválido.'], 400);

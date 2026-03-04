@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { apiGet } from '@/lib/api';
 import { getUrlTenantSlug } from '@/lib/tenant';
+import { useAuth } from '@/auth/context/auth-context';
 
 export interface Platform {
   id: number;
@@ -26,13 +27,18 @@ const PlatformContext = createContext<PlatformContextValue>({
 export function PlatformProvider({ children }: { children: React.ReactNode }) {
   const [platforms, setPlatforms] = useState<Platform[]>([]);
   const [selectedPlatform, setSelectedPlatform] = useState<Platform | null>(null);
+  const { auth } = useAuth();
 
   const fetchPlatforms = useCallback(() => {
+    if (!auth?.access_token) {
+      setPlatforms([]);
+      return;
+    }
     if (getUrlTenantSlug() !== 'master') return;
     apiGet<{ data: Platform[] }>('/v1/platforms?per_page=100&sort=order&direction=desc')
       .then((res) => setPlatforms(res.data))
       .catch(() => setPlatforms([]));
-  }, []);
+  }, [auth?.access_token]);
 
   useEffect(() => {
     fetchPlatforms();

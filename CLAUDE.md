@@ -356,9 +356,10 @@ Todas protegidas por `auth:sanctum`. `{module}` = `slug` do registro na tabela `
 Resolve a conexão do banco com base no hostname ou headers.
 
 **Resolução:**
-- **Produção** — hostname: `{tenant}.{platform}.api.{base-domain}`
-- **Dev local** — `api.tc.test` + headers: `X-Tenant`, `X-Platform`, `X-Sandbox` (opcional)
-- `.sandbox.` no hostname → `schema='sand'`, senão → `schema='prod'`
+- **Produção** — hostname: `{tenant}.{platform}.api.{base-domain}` (ex: `master.tc.api.twoclicks.com.br`)
+- **Header-based** — quando `parts[0] === 'api'` (ex: `api.tc.test`, `api.sandbox.twoclicks.com.br`) ou hostname tem < 4 partes: usa headers `X-Tenant`, `X-Platform`, `X-Sandbox`
+- `X-Sandbox: 1` ou `X-Sandbox: true` → `schema='sand'`
+- Em produção, `sandbox` presente em qualquer parte após `parts[1]` → `schema='sand'`
 
 **Níveis de acesso (`config('app.access_level')`):**
 - `master` — tenant=`master` + platform=`ROOT_PLATFORM_SLUG` (env, default `tc`)
@@ -635,6 +636,7 @@ Carrega módulos `type=module` ativos. Usado pelo sidebar dinâmico.
 Centraliza lista de plataformas e plataforma selecionada.
 - `platforms`, `selectedPlatform`, `selectPlatform()`, `refreshPlatforms()`
 - Busca: `/v1/platforms?per_page=100&sort=order&direction=desc`
+- Guarda de autenticação: `useAuth()` — fetch só dispara quando `auth?.access_token` existe (mesmo padrão do ModulesProvider)
 
 ### Sandbox Banner (`components/sandbox-banner.tsx`)
 
